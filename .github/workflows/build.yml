@@ -1,0 +1,66 @@
+name: Build Overlay DEX
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.2'
+
+      - name: Accept Android Licenses
+        run: yes | $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager --licenses || true
+
+      - name: Install Android SDK
+        run: |
+          $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager \
+            "platforms;android-33" \
+            "build-tools;33.0.2"
+
+      - name: Build Debug APK
+        run: gradle assembleDebug
+
+      - name: Extract DEX via d8
+        run: |
+          mkdir -p output
+          D8=$ANDROID_SDK_ROOT/build-tools/33.0.2/d8
+
+          # Collect .class files dari module kita saja (bukan framework)
+          find app/build/intermediates/javac/debug -name "*.class" > /tmp/class_list.txt
+          echo "Found $(wc -l < /tmp/class_list.txt) class files:"
+          cat /tmp/class_list.txt
+
+          # d8 compile ke single DEX
+          $D8 \
+            --output output/ \
+            --min-api 21 \
+            $(cat /tmp/class_list.txt)
+
+          # Rename jadi classes2.dex untuk inject
+          mv output/classes.dex output/classes2.dex
+
+          cp smali/inject.smali output/inject.smali
+          cp smali/README.md output/README.md
+          echo "Done. DEX size: $(wc -c < output/classes2.dex) bytes"
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: overlay-dex-${{ github.run_number }}
+          path: output/
