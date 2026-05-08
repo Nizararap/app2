@@ -22,9 +22,9 @@ public class OverlayView extends LinearLayout {
     private static final int COLOR_TEXT    = Color.WHITE;
     private static final int COLOR_OFF     = Color.parseColor("#FF5252"); // Red
 
-    private final WindowManager windowManager;
-    private final WindowManager.LayoutParams layoutParams;
-    private final SharedMemoryManager shm;
+    private WindowManager windowManager;
+    private WindowManager.LayoutParams layoutParams;
+    private SharedMemoryManager shm;
 
     private LinearLayout panelExpanded;
     private TextView tvCollapsed;
@@ -131,34 +131,39 @@ public class OverlayView extends LinearLayout {
     @Override
     protected void onDraw(Canvas canvas) {
         super.onDraw(canvas);
-        // --- RADAR DRAWING LOGIC ---
-        if (shm.isBattleStarted()) {
+        if (shm != null && shm.isBattleStarted()) {
             Paint p = new Paint();
             p.setColor(Color.RED);
             p.setStyle(Paint.Style.FILL);
-            
-            // Contoh menggambar titik radar (nanti sesuaikan dengan koordinat dari SHM)
-            // canvas.drawCircle(x, y, 10, p);
+            // Logic radar drawing...
         }
     }
 
-    // --- HELPERS & DRAG LOGIC (SAME AS BEFORE) ---
     private void showCollapsed() { isExpanded = false; panelExpanded.setVisibility(GONE); tvCollapsed.setVisibility(VISIBLE); }
     private void showExpanded() { isExpanded = true; tvCollapsed.setVisibility(GONE); panelExpanded.setVisibility(VISIBLE); }
     private int dp(int v) { return (int)(v * getContext().getResources().getDisplayMetrics().density); }
     
     private float touchStartX, touchStartY;
     private int initX, initY;
-    private final OnTouchListener dragListener = (v, e) -> {
-        switch (e.getAction()) {
-            case MotionEvent.ACTION_DOWN: touchStartX = e.getRawX(); touchStartY = e.getRawY(); initX = layoutParams.x; initY = layoutParams.y; return true;
-            case MotionEvent.ACTION_MOVE:
-                layoutParams.x = initX + (int)(e.getRawX() - touchStartX);
-                layoutParams.y = initY + (int)(e.getRawY() - touchStartY);
-                windowManager.updateViewLayout(this, layoutParams);
-                return true;
+    private final OnTouchListener dragListener = new OnTouchListener() {
+        @Override
+        public boolean onTouch(View v, MotionEvent e) {
+            switch (e.getAction()) {
+                case MotionEvent.ACTION_DOWN:
+                    touchStartX = e.getRawX();
+                    touchStartY = e.getRawY();
+                    initX = layoutParams.x;
+                    initY = layoutParams.y;
+                    return true;
+                case MotionEvent.ACTION_MOVE:
+                    layoutParams.x = initX + (int)(e.getRawX() - touchStartX);
+                    layoutParams.y = initY + (int)(e.getRawY() - touchStartY);
+                    windowManager.updateViewLayout(OverlayView.this, layoutParams);
+                    return true;
+            }
+            return false;
         }
-        return false;
     };
+
     interface ToggleCallback { void onToggle(boolean on); }
 }
