@@ -5,8 +5,10 @@ import android.content.Intent;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
+import android.graphics.PixelFormat;
 import android.graphics.Typeface;
 import android.net.Uri;
+import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.WindowManager;
@@ -15,12 +17,12 @@ import android.widget.TextView;
 
 public class OverlayView extends LinearLayout {
 
-    // --- COLORS (MATCHING JNI.ZIP) ---
+    // ---------- warna ----------
     private static final int COLOR_BG      = Color.argb(245, 15, 15, 15);
     private static final int COLOR_HEADER  = Color.argb(255, 30, 30, 30);
-    private static final int COLOR_ACCENT  = Color.parseColor("#00E676"); // Green
+    private static final int COLOR_ACCENT  = Color.parseColor("#00E676");
     private static final int COLOR_TEXT    = Color.WHITE;
-    private static final int COLOR_OFF     = Color.parseColor("#FF5252"); // Red
+    private static final int COLOR_OFF     = Color.parseColor("#FF5252");
 
     private WindowManager windowManager;
     private WindowManager.LayoutParams layoutParams;
@@ -29,6 +31,12 @@ public class OverlayView extends LinearLayout {
     private LinearLayout panelExpanded;
     private TextView tvCollapsed;
     private boolean isExpanded = false;
+
+    // ---------- drag ----------
+    private float touchStartX, touchStartY;
+    private int initX, initY;
+    private boolean isDragging = false;
+    private static final int CLICK_THRESHOLD = 10; // px
 
     public OverlayView(Context context, WindowManager wm, WindowManager.LayoutParams params) {
         super(context);
@@ -39,19 +47,20 @@ public class OverlayView extends LinearLayout {
         setOrientation(VERTICAL);
         buildCollapsedPill(context);
         buildExpandedPanel(context);
-        
+
         showCollapsed();
-        
-        // Start Radar Refresh Loop
+
+        // refresh radar ~30 fps
         postDelayed(new Runnable() {
             @Override
             public void run() {
-                invalidate(); // Redraw Radar
-                postDelayed(this, 33); // ~30 FPS
+                invalidate();
+                postDelayed(this, 33);
             }
         }, 100);
     }
 
+    // -------------------- UI builder --------------------
     private void buildCollapsedPill(Context ctx) {
         tvCollapsed = new TextView(ctx);
         tvCollapsed.setText("⚡ MOD MENU");
@@ -60,8 +69,7 @@ public class OverlayView extends LinearLayout {
         tvCollapsed.setTypeface(null, Typeface.BOLD);
         tvCollapsed.setPadding(30, 20, 30, 20);
         tvCollapsed.setBackgroundColor(COLOR_HEADER);
-        tvCollapsed.setOnClickListener(v -> showExpanded());
-        tvCollapsed.setOnTouchListener(dragListener);
+        tvCollapsed.setOnTouchListener(pillTouchListener);
         addView(tvCollapsed);
     }
 
@@ -71,26 +79,26 @@ public class OverlayView extends LinearLayout {
         panelExpanded.setBackgroundColor(COLOR_BG);
         panelExpanded.setMinimumWidth(dp(240));
 
-        // --- HEADER ---
+        // title
         TextView tvTitle = new TextView(ctx);
         tvTitle.setText("MOD MENU v1.0");
         tvTitle.setTextColor(COLOR_ACCENT);
-        tvTitle.setGravity(android.view.Gravity.CENTER);
+        tvTitle.setGravity(Gravity.CENTER);
         tvTitle.setPadding(0, dp(15), 0, dp(15));
         tvTitle.setTypeface(null, Typeface.BOLD);
         tvTitle.setBackgroundColor(COLOR_HEADER);
         panelExpanded.addView(tvTitle);
 
-        // --- FEATURES ---
+        // toggles
         panelExpanded.addView(buildToggle(ctx, "Aimbot", on -> shm.setAimbot(on)));
         panelExpanded.addView(buildToggle(ctx, "Auto Retribution", on -> shm.setAutoRetri(on)));
-        panelExpanded.addView(buildToggle(ctx, "Radar Hack", on -> { /* Logic in onDraw */ }));
+        panelExpanded.addView(buildToggle(ctx, "Radar Hack", on -> { /* drawn in onDraw */ }));
 
-        // --- TELEGRAM ---
+        // telegram
         TextView btnTele = new TextView(ctx);
         btnTele.setText("✈ JOIN TELEGRAM");
         btnTele.setTextColor(Color.parseColor("#2196F3"));
-        btnTele.setGravity(android.view.Gravity.CENTER);
+        btnTele.setGravity(Gravity.CENTER);
         btnTele.setPadding(0, dp(12), 0, dp(12));
         btnTele.setTypeface(null, Typeface.BOLD);
         btnTele.setOnClickListener(v -> {
@@ -100,11 +108,11 @@ public class OverlayView extends LinearLayout {
         });
         panelExpanded.addView(btnTele);
 
-        // --- MINIMIZE ---
+        // minimize button
         TextView btnMin = new TextView(ctx);
         btnMin.setText("MINIMIZE");
         btnMin.setTextColor(Color.GRAY);
-        btnMin.setGravity(android.view.Gravity.CENTER);
+        btnMin.setGravity(Gravity.CENTER);
         btnMin.setPadding(0, dp(10), 0, dp(10));
         btnMin.setOnClickListener(v -> showCollapsed());
         panelExpanded.addView(btnMin);
@@ -113,7 +121,7 @@ public class OverlayView extends LinearLayout {
         addView(panelExpanded);
     }
 
-    private View buildToggle(Context ctx, String name, final ToggleCallback cb) {
+    private View buildToggle(Context ctx, String name, ToggleCallback cb) {
         final TextView tv = new TextView(ctx);
         tv.setText(name + ": OFF");
         tv.setTextColor(COLOR_OFF);
@@ -128,24 +136,8 @@ public class OverlayView extends LinearLayout {
         return tv;
     }
 
-    @Override
-    protected void onDraw(Canvas canvas) {
-        super.onDraw(canvas);
-        if (shm != null && shm.isBattleStarted()) {
-            Paint p = new Paint();
-            p.setColor(Color.RED);
-            p.setStyle(Paint.Style.FILL);
-            // Logic radar drawing...
-        }
-    }
-
-    private void showCollapsed() { isExpanded = false; panelExpanded.setVisibility(GONE); tvCollapsed.setVisibility(VISIBLE); }
-    private void showExpanded() { isExpanded = true; tvCollapsed.setVisibility(GONE); panelExpanded.setVisibility(VISIBLE); }
-    private int dp(int v) { return (int)(v * getContext().getResources().getDisplayMetrics().density); }
-    
-    private float touchStartX, touchStartY;
-    private int initX, initY;
-    private final OnTouchListener dragListener = new OnTouchListener() {
+    // -------------------- touch for pill (drag + tap) --------------------
+    private final OnTouchListener pillTouchListener = new OnTouchListener() {
         @Override
         public boolean onTouch(View v, MotionEvent e) {
             switch (e.getAction()) {
@@ -154,16 +146,69 @@ public class OverlayView extends LinearLayout {
                     touchStartY = e.getRawY();
                     initX = layoutParams.x;
                     initY = layoutParams.y;
+                    isDragging = false;
                     return true;
                 case MotionEvent.ACTION_MOVE:
-                    layoutParams.x = initX + (int)(e.getRawX() - touchStartX);
-                    layoutParams.y = initY + (int)(e.getRawY() - touchStartY);
-                    windowManager.updateViewLayout(OverlayView.this, layoutParams);
+                    if (Math.abs(e.getRawX() - touchStartX) > CLICK_THRESHOLD ||
+                        Math.abs(e.getRawY() - touchStartY) > CLICK_THRESHOLD) {
+                        isDragging = true;
+                    }
+                    if (isDragging) {
+                        layoutParams.x = initX + (int)(e.getRawX() - touchStartX);
+                        layoutParams.y = initY + (int)(e.getRawY() - touchStartY);
+                        windowManager.updateViewLayout(OverlayView.this, layoutParams);
+                    }
+                    return true;
+                case MotionEvent.ACTION_UP:
+                    if (!isDragging) {
+                        // tap -> toggle menu
+                        if (isExpanded) showCollapsed(); else showExpanded();
+                    }
                     return true;
             }
             return false;
         }
     };
+
+    // -------------------- show / hide --------------------
+    private void showCollapsed() {
+        isExpanded = false;
+        panelExpanded.setVisibility(GONE);
+        tvCollapsed.setVisibility(VISIBLE);
+    }
+    private void showExpanded() {
+        isExpanded = true;
+        tvCollapsed.setVisibility(GONE);
+        panelExpanded.setVisibility(VISIBLE);
+    }
+
+    // -------------------- radar drawing --------------------
+    @Override
+    protected void onDraw(Canvas canvas) {
+        super.onDraw(canvas);
+        if (shm == null || !shm.isBattleStarted()) return;
+
+        int count = shm.getPlayerCount();
+        if (count <= 0) return;
+
+        Paint enemyPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        enemyPaint.setStyle(Paint.Style.FILL);
+
+        // sederhana: gambar lingkaran merah di posisi musuh yang sudah diskalakan
+        for (int i = 0; i < count; i++) {
+            if (!shm.isPlayerEnemy(i)) continue;  // hanya musuh
+            float x = shm.getPlayerPosX(i);
+            float y = shm.getPlayerPosY(i);
+            // skalakan ke view (contoh statis, perlu world2screen sebenarnya)
+            float sx = x * 0.02f + 100;   // dummy mapping
+            float sy = y * 0.02f + 100;
+            enemyPaint.setColor(Color.RED);
+            canvas.drawCircle(sx, sy, 8, enemyPaint);
+        }
+    }
+
+    // -------------------- helpers --------------------
+    private int dp(int v) { return (int)(v * getContext().getResources().getDisplayMetrics().density); }
 
     interface ToggleCallback { void onToggle(boolean on); }
 }
