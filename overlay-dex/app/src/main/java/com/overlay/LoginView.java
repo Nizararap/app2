@@ -1,5 +1,6 @@
 package com.overlay;
 
+import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
@@ -41,12 +42,32 @@ public class LoginView extends LinearLayout {
     private boolean dragging;
     private boolean isAttached = false;
 
+    // CACHE untuk clipboard (mengatasi pembatasan akses di background)
+    private String lastClipboardText = "";
+    private ClipboardManager clipboardManager;
+
     public LoginView(Context context, WindowManager wm, WindowManager.LayoutParams lp, Runnable onLoginSuccess) {
         super(context);
         this.wm = wm;
         this.lp = lp;
         this.onLoginSuccess = onLoginSuccess;
         this.authManager = new KeyAuthManager(context);
+
+        // Inisialisasi clipboard manager dan pasang listener permanen
+        clipboardManager = (ClipboardManager) context.getSystemService(Context.CLIPBOARD_SERVICE);
+        if (clipboardManager != null) {
+            clipboardManager.addPrimaryClipChangedListener(() -> {
+                if (clipboardManager.hasPrimaryClip()) {
+                    ClipData clip = clipboardManager.getPrimaryClip();
+                    if (clip != null && clip.getItemCount() > 0) {
+                        CharSequence text = clip.getItemAt(0).getText();
+                        if (text != null) {
+                            lastClipboardText = text.toString().trim();
+                        }
+                    }
+                }
+            });
+        }
 
         setOrientation(VERTICAL);
         
@@ -125,7 +146,7 @@ public class LoginView extends LinearLayout {
         header.addView(minBtn);
         loginCard.addView(header);
 
-        // Input Area with Paste Button
+        // Input Area with Paste & Clear Buttons
         LinearLayout inputArea = new LinearLayout(ctx);
         inputArea.setOrientation(HORIZONTAL);
         inputArea.setGravity(Gravity.CENTER_VERTICAL);
@@ -151,49 +172,69 @@ public class LoginView extends LinearLayout {
         etKey.setLayoutParams(etLp);
         inputArea.addView(etKey);
 
-  // Paste Button
-TextView btnPaste = new TextView(ctx);
-btnPaste.setText("PASTE");
-btnPaste.setTextColor(Color.BLACK);
-btnPaste.setTextSize(11f);
-btnPaste.setTypeface(null, Typeface.BOLD);
-btnPaste.setGravity(Gravity.CENTER);
-btnPaste.setPadding(dp(10), dp(8), dp(10), dp(8));
+        // Clear Button (✕)
+        TextView btnClear = new TextView(ctx);
+        btnClear.setText("✕");
+        btnClear.setTextColor(Color.WHITE);
+        btnClear.setTextSize(14f);
+        btnClear.setGravity(Gravity.CENTER);
+        btnClear.setPadding(dp(8), dp(8), dp(8), dp(8));
+        btnClear.setOnClickListener(vv -> {
+            etKey.setText("");
+        });
+        inputArea.addView(btnClear);
 
-GradientDrawable pBg = new GradientDrawable();
-pBg.setColor(C_ACCENT);
-pBg.setCornerRadius(dp(5));
-btnPaste.setBackground(pBg);
+        // Paste Button
+        TextView btnPaste = new TextView(ctx);
+        btnPaste.setText("PASTE");
+        btnPaste.setTextColor(Color.BLACK);
+        btnPaste.setTextSize(11f);
+        btnPaste.setTypeface(null, Typeface.BOLD);
+        btnPaste.setGravity(Gravity.CENTER);
+        btnPaste.setPadding(dp(10), dp(8), dp(10), dp(8));
+        
+        GradientDrawable pBg = new GradientDrawable();
+        pBg.setColor(C_ACCENT);
+        pBg.setCornerRadius(dp(5));
+        btnPaste.setBackground(pBg);
+        
+        LayoutParams pLp = new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
+        pLp.setMargins(dp(8), 0, 0, 0);
+        btnPaste.setLayoutParams(pLp);
 
-LayoutParams pLp = new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
-pLp.setMargins(dp(8), 0, 0, 0);
-btnPaste.setLayoutParams(pLp);
-
-// FIX: Tangani sentuhan secara mandiri agar tidak di-intercept oleh drag listener
-btnPaste.setOnTouchListener((v, event) -> {
-    if (event.getAction() == MotionEvent.ACTION_UP) {
-        v.performClick();
-    }
-    return true; // Konsumsi event, cegah dragL ikut campur
-});
-
-btnPaste.setOnClickListener(v -> {
-    try {
-        ClipboardManager clipboard = (ClipboardManager) ctx.getSystemService(Context.CLIPBOARD_SERVICE);
-        if (clipboard != null && clipboard.hasPrimaryClip()) {
-            CharSequence text = clipboard.getPrimaryClip().getItemAt(0).getText();
-            if (text != null) {
-                etKey.setText(text.toString().trim());
-                Toast.makeText(ctx, "Pasted!", Toast.LENGTH_SHORT).show();
+        // FIX: Touch listener sendiri untuk menghindari interferensi drag
+        btnPaste.setOnTouchListener((v, event) -> {
+            if (event.getAction() == MotionEvent.ACTION_UP) {
+                v.performClick();
             }
-        } else {
-            Toast.makeText(ctx, "Clipboard empty!", Toast.LENGTH_SHORT).show();
-        }
-    } catch (Exception e) {
-        Toast.makeText(ctx, "Paste failed!", Toast.LENGTH_SHORT).show();
-    }
-});
-inputArea.addView(btnPaste);
+            return true;
+        });
+        
+        btnPaste.setOnClickListener(v -> {
+            // Utamakan teks dari cache (disimpan otomatis saat user menyalin)
+            if (lastClipboardText != null && !lastClipboardText.isEmpty()) {
+                etKey.setText(lastClipboardText);
+                Toast.makeText(ctx, "Pasted!", Toast.LENGTH_SHORT).show();
+                return;
+            }
+
+            // Fallback: coba baca langsung (kadang masih bisa)
+            try {
+                ClipboardManager cm = (ClipboardManager) ctx.getSystemService(Context.CLIPBOARD_SERVICE);
+                if (cm != null && cm.hasPrimaryClip()) {
+                    CharSequence text = cm.getPrimaryClip().getItemAt(0).getText();
+                    if (text != null && text.length() > 0) {
+                        etKey.setText(text.toString().trim());
+                        lastClipboardText = text.toString().trim();
+                        Toast.makeText(ctx, "Pasted!", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                }
+            } catch (Exception ignored) {}
+
+            Toast.makeText(ctx, "Clipboard kosong. Salin key dulu!", Toast.LENGTH_SHORT).show();
+        });
+        inputArea.addView(btnPaste);
         
         loginCard.addView(inputArea);
 
