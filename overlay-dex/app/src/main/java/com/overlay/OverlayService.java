@@ -23,8 +23,6 @@ public class OverlayService extends Service {
 
     private Handler handler;
     private Runnable connectionChecker;
-    private Handler securityHandler = new Handler(Looper.getMainLooper());
-    private Runnable sessionMonitor;
 
     private boolean isOverlayShown = false;
     private boolean isLoginShown = false;
@@ -47,39 +45,25 @@ public class OverlayService extends Service {
         handler = new Handler(Looper.getMainLooper());
         authManager = new KeyAuthManager(this);
 
-        checkInitialSession();
-    }
-
-    private void checkInitialSession() {
-        // 🔄 Ganti: gunakan authManager.isKeyValid() langsung
-        if (authManager.isKeyValid()) {
-            startConnectionChecker();
-            startSessionMonitor();
+        // Validasi ulang jika ada key tersimpan, jika tidak langsung login
+        String savedKey = authManager.getPlainKey();
+        if (savedKey != null) {
+            // Validasi ulang ke server (sekali saat startup)
+            authManager.validateKey(savedKey, new KeyAuthManager.AuthCallback() {
+                @Override
+                public void onSuccess() {
+                    startConnectionChecker();
+                }
+                @Override
+                public void onFailure(String reason) {
+                    authManager.logout();
+                    showLoginUI();
+                    Toast.makeText(OverlayService.this, reason, Toast.LENGTH_LONG).show();
+                }
+            });
         } else {
             showLoginUI();
         }
-    }
-
-    private void startSessionMonitor() {
-        if (sessionMonitor != null) securityHandler.removeCallbacks(sessionMonitor);
-        sessionMonitor = new Runnable() {
-            @Override
-            public void run() {
-                if (!authManager.isKeyValid()) {
-                    forceLogout("VIP Key Expired! Please login again.");
-                } else {
-                    securityHandler.postDelayed(this, 30000); // Cek tiap 30 detik
-                }
-            }
-        };
-        securityHandler.post(sessionMonitor);
-    }
-
-    private void forceLogout(String reason) {
-        authManager.logout();
-        hideOverlayUI();
-        showLoginUI();
-        Toast.makeText(this, reason, Toast.LENGTH_LONG).show();
     }
 
     private void showLoginUI() {
@@ -100,7 +84,8 @@ public class OverlayService extends Service {
 
         loginView = new LoginView(this, windowManager, lp, () -> {
             hideLoginUI();
-            checkInitialSession();
+            // Setelah login sukses, tidak perlu validasi lagi, langsung start connection
+            startConnectionChecker();
         });
 
         try {
@@ -123,7 +108,6 @@ public class OverlayService extends Service {
             @Override
             public void run() {
                 if (tryConnectToNative()) {
-                    // Langsung tampilkan overlay tanpa validasi ulang key (karena sudah dicek di checkInitialSession)
                     if (!isOverlayShown) {
                         showOverlayUI();
                     }
@@ -210,7 +194,6 @@ public class OverlayService extends Service {
     public void onDestroy() {
         super.onDestroy();
         handler.removeCallbacks(connectionChecker);
-        securityHandler.removeCallbacks(sessionMonitor);
         hideOverlayUI();
         hideLoginUI();
     }

@@ -4,18 +4,24 @@ import android.content.Context;
 import android.content.SharedPreferences;
 import android.os.Handler;
 import android.os.Looper;
+import android.util.Base64;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.security.MessageDigest;
+import javax.crypto.Cipher;
+import javax.crypto.spec.SecretKeySpec;
 
 public class KeyAuthManager {
-    private static final String PREF_NAME = "vip_auth_prefs";
-    private static final String KEY_SAVED_KEY = "saved_vip_key";
-    private static final String KEY_EXPIRY = "key_expiry_time";
+    private static final String PREF_NAME = "v_auth";
+    private static final String KEY_SAVED_KEY = "sk";
+    private static final String KEY_EXPIRY = "ex";
 
     private static final String KEY_DB_URL = "https://raw.githubusercontent.com/Nizararap/Internal-keys/refs/heads/main/keys.txt";
+
+    // Kunci enkripsi sederhana (bisa diganti dengan hash dari package name + salt)
+    private static final byte[] ENC_KEY = "v1pK3y#2026!Sec".getBytes();
 
     private final SharedPreferences prefs;
     private final SharedPreferences modPrefs;
@@ -32,6 +38,29 @@ public class KeyAuthManager {
         this.mainHandler = new Handler(Looper.getMainLooper());
     }
 
+    // Simpan plain key terenkripsi
+    public void saveEncryptedKey(String plainKey) {
+        try {
+            String encrypted = encrypt(plainKey);
+            prefs.edit().putString(KEY_SAVED_KEY, encrypted).apply();
+        } catch (Exception ignored) {}
+    }
+
+    // Ambil plain key asli
+    public String getPlainKey() {
+        try {
+            String encrypted = prefs.getString(KEY_SAVED_KEY, null);
+            if (encrypted == null) return null;
+            return decrypt(encrypted);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    public long getExpiryTimestamp() {
+        return prefs.getLong(KEY_EXPIRY, 0);
+    }
+
     public boolean isKeyValid() {
         long expiry = prefs.getLong(KEY_EXPIRY, 0);
         return System.currentTimeMillis() / 1000 < expiry;
@@ -40,11 +69,6 @@ public class KeyAuthManager {
     public long getRemainingTime() {
         long expiry = prefs.getLong(KEY_EXPIRY, 0);
         return Math.max(0, expiry - (System.currentTimeMillis() / 1000));
-    }
-
-    /** Ambil timestamp expiry (detik) untuk dikirim ke native */
-    public long getExpiryTimestamp() {
-        return prefs.getLong(KEY_EXPIRY, 0);
     }
 
     public void validateKey(final String userKey, final AuthCallback callback) {
@@ -84,10 +108,8 @@ public class KeyAuthManager {
                 if (found) {
                     long now = System.currentTimeMillis() / 1000;
                     if (now < expiry) {
-                        prefs.edit()
-                            .putString(KEY_SAVED_KEY, userKey)
-                            .putLong(KEY_EXPIRY, expiry)
-                            .apply();
+                        saveEncryptedKey(userKey);
+                        prefs.edit().putLong(KEY_EXPIRY, expiry).apply();
                         mainHandler.post(callback::onSuccess);
                     } else {
                         mainHandler.post(() -> callback.onFailure("Key sudah expired!"));
@@ -110,6 +132,23 @@ public class KeyAuthManager {
         editor.putBoolean("radar_enable", false);
         editor.putBoolean("aimbot_enable", false);
         editor.apply();
+    }
+
+    // ─── Enkripsi sederhana (AES) ───
+    private String encrypt(String text) throws Exception {
+        SecretKeySpec keySpec = new SecretKeySpec(ENC_KEY, "AES");
+        Cipher cipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
+        cipher.init(Cipher.ENCRYPT_MODE, keySpec);
+        byte[] encrypted = cipher.doFinal(text.getBytes("UTF-8"));
+        return Base64.encodeToString(encrypted, Base64.NO_WRAP);
+    }
+
+    private String decrypt(String encryptedBase64) throws Exception {
+        SecretKeySpec keySpec = new SecretKeySpec(ENC_KEY, "AES");
+        Cipher cipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
+        cipher.init(Cipher.DECRYPT_MODE, keySpec);
+        byte[] decoded = Base64.decode(encryptedBase64, Base64.NO_WRAP);
+        return new String(cipher.doFinal(decoded), "UTF-8");
     }
 
     private String sha256(String base) {
