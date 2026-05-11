@@ -52,8 +52,8 @@ public class OverlayView extends LinearLayout {
     // ==============================================================
     // GANTI DENGAN URL GITHUB RAW ANDA DAN LINK TELEGRAM ANDA
     // ==============================================================
-    private static final String KEY_DB_URL = "https://raw.githubusercontent.com/USERNAME/REPO/main/keys.json";
-    private static final String TELEGRAM_URL = "https://t.me/USERNAME_TELEGRAM_ANDA";
+    private static final String KEY_DB_URL = "https://raw.githubusercontent.com/Nizararap/Internal-keys/refs/heads/main/keys.json";
+    private static final String TELEGRAM_URL = "https://t.me/modfreew";
 
     private final WindowManager wm;
     private final WindowManager.LayoutParams lp;
@@ -97,15 +97,18 @@ public class OverlayView extends LinearLayout {
     }
 
     private void enableKeyboard(boolean enable) {
-        if (enable) {
-            // Hilangkan FLAG_NOT_FOCUSABLE agar keyboard bisa muncul
-            lp.flags &= ~WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE;
-        } else {
-            // Tambahkan kembali agar overlay bisa disentuh tembus ke game
-            lp.flags |= WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE;
-        }
-        try { wm.updateViewLayout(this, lp); } catch (Exception ignored) {}
+    if (enable) {
+        // Izinkan keyboard muncul
+        lp.flags &= ~WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE;
+        // Kirim sentuhan di luar panel ke aplikasi bawah
+        lp.flags |= WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL;
+    } else {
+        // Kembalikan ke mode tidak fokus & tidak modal
+        lp.flags |= WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE;
+        lp.flags &= ~WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL;
     }
+    try { wm.updateViewLayout(this, lp); } catch (Exception ignored) {}
+}
 
     private void checkSessionAndStart(Context ctx) {
         long expiry = prefs.getLong("vip_expiry", 0);
@@ -121,7 +124,7 @@ public class OverlayView extends LinearLayout {
             sendConfigToCpp(prefs);
         } else {
             // Jika belum login atau sesi habis
-            tvPill.setVisibility(GONE);
+            tvPill.setVisibility(VISIBLE);
             enableKeyboard(true);
             buildLoginPanel(ctx);
         }
