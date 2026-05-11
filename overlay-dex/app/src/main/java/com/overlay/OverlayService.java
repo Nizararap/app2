@@ -45,7 +45,7 @@ public class OverlayService extends Service {
         handler = new Handler(Looper.getMainLooper());
         authManager = new KeyAuthManager(this);
 
-        // Validasi ulang jika ada key tersimpan, jika tidak langsung login
+// Validasi ulang jika ada key tersimpan, jika tidak langsung login
         String savedKey = authManager.getPlainKey();
         if (savedKey != null) {
             // Validasi ulang ke server (sekali saat startup)
@@ -56,9 +56,21 @@ public class OverlayService extends Service {
                 }
                 @Override
                 public void onFailure(String reason) {
-                    authManager.logout();
-                    showLoginUI();
-                    Toast.makeText(OverlayService.this, reason, Toast.LENGTH_LONG).show();
+                    if (reason.startsWith("NET_ERROR")) {
+                        // JANGAN logout jika hanya jaringan lambat saat virtual space baru dibuka
+                        if (authManager.isKeyValid()) {
+                            // Masuk menggunakan sisa waktu lokal (Offline Grace Period)
+                            startConnectionChecker(); 
+                        } else {
+                            authManager.logout();
+                            showLoginUI();
+                        }
+                    } else {
+                        // Key terbukti expired atau dihapus dari github
+                        authManager.logout();
+                        showLoginUI();
+                        Toast.makeText(OverlayService.this, reason, Toast.LENGTH_LONG).show();
+                    }
                 }
             });
         } else {
@@ -108,12 +120,18 @@ public class OverlayService extends Service {
             @Override
             public void run() {
                 if (tryConnectToNative()) {
+                    // Jika C++ hidup, munculkan overlay
                     if (!isOverlayShown) {
                         showOverlayUI();
                     }
                 } else {
-                    handler.postDelayed(this, RETRY_DELAY_MS);
+                    // Jika C++ mati (game ditutup), hancurkan overlay (mencegah zombie/double)
+                    if (isOverlayShown) {
+                        hideOverlayUI();
+                    }
                 }
+                // SELALU ulangi pengecekan setiap 2 detik sebagai detak jantung (Heartbeat)
+                handler.postDelayed(this, RETRY_DELAY_MS);
             }
         };
         handler.post(connectionChecker);
@@ -138,16 +156,24 @@ public class OverlayService extends Service {
                 ? WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
                 : WindowManager.LayoutParams.TYPE_PHONE;
 
-        // Radar
+        // --- PERBAIKAN RADAR BORDER MISMATCH (Ada di bawah) ---
         WindowManager.LayoutParams radarParams = new WindowManager.LayoutParams(
                 WindowManager.LayoutParams.MATCH_PARENT,
                 WindowManager.LayoutParams.MATCH_PARENT,
                 type,
                 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE |
                 WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE |
-                WindowManager.LayoutParams.FLAG_FULLSCREEN,
+                WindowManager.LayoutParams.FLAG_FULLSCREEN |
+                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS | 
+                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
                 PixelFormat.TRANSLUCENT
         );
+        
+        // Izinkan Radar tembus area Poni (Notch) layar
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            radarParams.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
+        }
+
         radarView = new RadarView(this);
         windowManager.addView(radarView, radarParams);
 
@@ -177,7 +203,8 @@ public class OverlayService extends Service {
             } catch (Exception ignored) {}
             radarView = null;
         }
-        startConnectionChecker();
+        // PENTING: Dihapus pemanggilan startConnectionChecker() dari sini
+        // karena looping sudah di-handle penuh di atas
     }
 
     @Override

@@ -20,8 +20,8 @@ public class KeyAuthManager {
 
     private static final String KEY_DB_URL = "https://raw.githubusercontent.com/Nizararap/Internal-keys/refs/heads/main/keys.txt";
 
-    // Kunci enkripsi sederhana (bisa diganti dengan hash dari package name + salt)
-    private static final byte[] ENC_KEY = "v1pK3y#2026!Sec".getBytes();
+// PERBAIKAN: Ditambah huruf "X" di belakang agar genap 16 Byte!
+    private static final byte[] ENC_KEY = "v1pK3y#2026!SecX".getBytes();
 
     private final SharedPreferences prefs;
     private final SharedPreferences modPrefs;
@@ -38,7 +38,7 @@ public class KeyAuthManager {
         this.mainHandler = new Handler(Looper.getMainLooper());
     }
 
-// Simpan key dan expiry terenkripsi dalam satu kesatuan
+    // Simpan key dan expiry terenkripsi dalam satu kesatuan
     public void saveEncryptedData(String plainKey, long expirySec) {
         try {
             String data = plainKey + "|" + expirySec;
@@ -47,7 +47,7 @@ public class KeyAuthManager {
         } catch (Exception ignored) {}
     }
 
-    // Ambil array data [0] = plainKey, [1] = expirySec
+    // Ambil array data [0] = plainKey,[1] = expirySec
     private String[] getDecryptedData() {
         try {
             String encrypted = prefs.getString(KEY_SAVED_KEY, null);
@@ -90,20 +90,18 @@ public class KeyAuthManager {
                 URL url = new URL(KEY_DB_URL);
                 conn = (HttpURLConnection) url.openConnection();
                 conn.setRequestMethod("GET");
-                conn.setConnectTimeout(15000);
-                conn.setReadTimeout(15000);
-                // Matikan cache agar mendapat waktu server absolut (mencegah time spoofing)
+                conn.setConnectTimeout(8000);
+                conn.setReadTimeout(8000);
                 conn.setRequestProperty("Cache-Control", "no-cache");
                 conn.setUseCaches(false);
 
                 int responseCode = conn.getResponseCode();
                 if (responseCode != 200) {
-                    final int code = responseCode;
-                    mainHandler.post(() -> callback.onFailure("Server error: " + code));
+                    mainHandler.post(() -> callback.onFailure("NET_ERROR: Server error " + responseCode));
                     return;
                 }
 
-                // AMBIL WAKTU SERVER (Bypass perlindungan ganti tanggal HP saat login)
+                // Ambil waktu server absolut (Anti ubah tanggal HP)
                 long serverTimeSec = conn.getHeaderFieldDate("Date", System.currentTimeMillis()) / 1000;
 
                 BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream()));
@@ -122,7 +120,6 @@ public class KeyAuthManager {
 
                 if (found) {
                     if (serverTimeSec < expiry) {
-                        // Enkripsi dan simpan keduanya
                         saveEncryptedData(userKey, expiry);
                         mainHandler.post(callback::onSuccess);
                     } else {
@@ -132,8 +129,8 @@ public class KeyAuthManager {
                     mainHandler.post(() -> callback.onFailure("Key tidak valid!"));
                 }
             } catch (Exception e) {
-                final String msg = e.getMessage();
-                mainHandler.post(() -> callback.onFailure("Koneksi gagal: " + msg));
+                // Beri tag NET_ERROR agar tidak menghapus key saat lag
+                mainHandler.post(() -> callback.onFailure("NET_ERROR: " + e.getMessage()));
             } finally {
                 if (conn != null) conn.disconnect();
             }
