@@ -55,29 +55,37 @@ jobs:
           cp overlay-dex/smali/inject.smali output_artifact/inject.smali
           cp overlay-dex/smali/README.md output_artifact/README.md
 
-      # Enkripsi PNG ke BIN
-      - name: Obfuscate PNG to BIN
+      # Pack (ZIP) dan Enkripsi PNG jadi 1 file BIN
+      - name: Pack and Obfuscate Assets
         run: |
           python3 -c "
-          import os
-          key = 0x5B # KUNCI RAHASIA (Sama dengan yang di RadarView.java)
-          hero_dir = 'heroes' # Baca folder heroes di root repo
-          out_dir = 'output_artifact/heroes' # Simpan ke folder artifact
+          import os, zipfile, io
+          
+          key = 0x5B # KUNCI RAHASIA
+          hero_dir = 'heroes'
+          out_dir = 'output_artifact'
+          out_file = os.path.join(out_dir, 'heroes.bin')
           
           if os.path.exists(hero_dir):
-              for f in os.listdir(hero_dir):
-                  if f.endswith('.png'):
-                      with open(os.path.join(hero_dir, f), 'rb') as inf:
-                          data = bytearray(inf.read())
-                      
-                      # Enkripsi byte per byte dengan XOR
-                      for i in range(len(data)):
-                          data[i] ^= key
-                          
-                      out_name = f.replace('.png', '.bin')
-                      with open(os.path.join(out_dir, out_name), 'wb') as outf:
-                          outf.write(data)
-              print('Berhasil Obfuscate semua gambar PNG ke BIN!')
+              # Buat file ZIP sementara di memori (RAM)
+              zip_buffer = io.BytesIO()
+              with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zf:
+                  for f in os.listdir(hero_dir):
+                      if f.endswith('.png'):
+                          # Masukkan file png ke dalam ZIP
+                          zf.write(os.path.join(hero_dir, f), arcname=f)
+              
+              # Ambil byte dari hasil ZIP
+              data = bytearray(zip_buffer.getvalue())
+              
+              # Enkripsi byte per byte (Obfuscate)
+              for i in range(len(data)):
+                  data[i] ^= key
+                  
+              # Simpan sebagai 1 file tunggal: heroes.bin
+              with open(out_file, 'wb') as outf:
+                  outf.write(data)
+              print('Berhasil membungkus dan Obfuscate 129 PNG menjadi heroes.bin!')
           else:
               print('WARNING: Folder heroes tidak ditemukan di root!')
           "

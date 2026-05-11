@@ -11,6 +11,7 @@ import android.net.LocalSocket;
 import android.net.LocalSocketAddress;
 import android.view.View;
 
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.InputStream;
@@ -20,6 +21,8 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
 
 public class RadarView extends View {
     private Paint borderPaint, enemyPaint, textPaint;
@@ -27,14 +30,13 @@ public class RadarView extends View {
     private boolean isRunning = true;
     private SharedPreferences prefs;
 
-    // Cache Bitmap
+    // Cache untuk gambar yang sudah diproses & di-resize
     private Map<String, Bitmap> heroIconCache = new HashMap<>();
     private float currentIconSize = 0f;
 
-    // Map untuk mencocokkan nama otomatis (Auto-Detect Case Insensitive)
-    private Map<String, String> realAssetFiles = new HashMap<>();
+    // Cache mentahan gambar original (Hanya disimpan sekali di RAM)
+    private Map<String, Bitmap> preloadedIcons = new HashMap<>();
 
-    // Pool untuk max 20 player
     private PlayerInfo[] playerPool = new PlayerInfo[20]; 
 
     private static class PlayerInfo {
@@ -43,7 +45,6 @@ public class RadarView extends View {
         String heroName;
     }
 
-    // Fungsi untuk memotong bitmap jadi bulat
     private Bitmap getCircularBitmap(Bitmap bitmap) {
         Bitmap output = Bitmap.createBitmap(bitmap.getWidth(), bitmap.getHeight(), Bitmap.Config.ARGB_8888);
         Canvas canvas = new Canvas(output);
@@ -65,27 +66,53 @@ public class RadarView extends View {
             playerPool[i] = new PlayerInfo();
         }
         
-        scanAssetsFolder(); 
+        // Load & Decrypt heroes.bin SATU KALI saat pertama kali radar muncul
+        loadAndDecryptHeroes(); 
+        
         initPaints();
         startSocketThread();
     }
 
-    private void scanAssetsFolder() {
+    // FUNGSI BARU: Ekstrak heroes.bin dari memori
+    private void loadAndDecryptHeroes() {
         try {
-            String[] files = getContext().getAssets().list("heroes");
-            if (files != null) {
-                for (String file : files) {
-                    // Hanya memproses file .bin hasil obfuscate Github Action
-                    if (file.endsWith(".bin")) {
-                        // Hilangkan ".bin"
-                        int dotIndex = file.lastIndexOf('.');
-                        String nameOnly = (dotIndex > 0) ? file.substring(0, dotIndex) : file;
-                        
-                        String searchKey = nameOnly.toLowerCase().replaceAll("[^a-z0-9]", "");
-                        realAssetFiles.put(searchKey, file);
+            // Baca file tunggal heroes.bin dari folder assets
+            InputStream is = getContext().getAssets().open("heroes.bin");
+            ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+            int nRead;
+            byte[] data = new byte[4096];
+            while ((nRead = is.read(data, 0, data.length)) != -1) {
+                buffer.write(data, 0, nRead);
+            }
+            buffer.flush();
+            byte[] encryptedBytes = buffer.toByteArray();
+            is.close();
+
+            // 1. DEKRIPSI (XOR dengan kunci 0x5B)
+            byte key = 0x5B;
+            for (int i = 0; i < encryptedBytes.length; i++) {
+                encryptedBytes[i] ^= key;
+            }
+
+            // 2. UNZIP DARI MEMORI RAM
+            ByteArrayInputStream bais = new ByteArrayInputStream(encryptedBytes);
+            ZipInputStream zis = new ZipInputStream(bais);
+            ZipEntry entry;
+            
+            while ((entry = zis.getNextEntry()) != null) {
+                if (entry.getName().endsWith(".png")) {
+                    // Decode PNG yang ada di dalam ZIP
+                    Bitmap bmp = BitmapFactory.decodeStream(zis);
+                    if (bmp != null) {
+                        // Kunci pencarian: hilangkan ".png", jadikan huruf kecil, buang spasi
+                        String searchKey = entry.getName().replace(".png", "").toLowerCase().replaceAll("[^a-z0-9]", "");
+                        preloadedIcons.put(searchKey, bmp); // Simpan mentahannya di RAM
                     }
                 }
+                zis.closeEntry();
             }
+            zis.close();
+            bais.close();
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -113,62 +140,32 @@ public class RadarView extends View {
     private Bitmap getHeroIcon(String heroName, float targetSize) {
         String searchKey = heroName.toLowerCase().replaceAll("[^a-z0-9]", "");
         
+        // Jika ukuran icon berubah (user geser slider), bersihkan cache bulatan
         if (currentIconSize != targetSize) {
             heroIconCache.clear();
             currentIconSize = targetSize;
         }
 
+        // Ambil icon bulat dari cache jika sudah ada
         if (heroIconCache.containsKey(searchKey)) {
             return heroIconCache.get(searchKey);
         }
 
-        // CARI NAMA FILE ASLI (contoh: Zilong.bin)
-        String realFileName = realAssetFiles.get(searchKey);
+        // Ambil gambar mentah dari memori preloaded
+        Bitmap originalBmp = preloadedIcons.get(searchKey);
+        if (originalBmp == null) {
+            heroIconCache.put(searchKey, null);
+            return null;
+        }
+
+        // Proses resize dan buat bulat (hanya 1x per hero)
+        int size = (int) targetSize;
+        if (size <= 0) size = 50;
+        Bitmap scaledBmp = Bitmap.createScaledBitmap(originalBmp, size, size, true);
+        Bitmap circularBmp = getCircularBitmap(scaledBmp); 
         
-        if (realFileName == null) {
-            heroIconCache.put(searchKey, null);
-            return null;
-        }
-
-        try {
-            InputStream is = getContext().getAssets().open("heroes/" + realFileName);
-            
-            // 1. Baca semua data BIN ke memory
-            ByteArrayOutputStream buffer = new ByteArrayOutputStream();
-            int nRead;
-            byte[] data = new byte[4096];
-            while ((nRead = is.read(data, 0, data.length)) != -1) {
-                buffer.write(data, 0, nRead);
-            }
-            buffer.flush();
-            byte[] encryptedBytes = buffer.toByteArray();
-            is.close();
-
-            // 2. Dekripsi (XOR) dengan kunci 0x5B (Harus sama dengan di Github Actions)
-            byte key = 0x5B; 
-            for (int i = 0; i < encryptedBytes.length; i++) {
-                encryptedBytes[i] ^= key;
-            }
-
-            // 3. Ubah byte yang didekripsi menjadi Bitmap
-            Bitmap bmp = BitmapFactory.decodeByteArray(encryptedBytes, 0, encryptedBytes.length);
-            if (bmp == null) {
-                heroIconCache.put(searchKey, null);
-                return null;
-            }
-
-            int size = (int) targetSize;
-            if (size <= 0) size = 50;
-            Bitmap scaledBmp = Bitmap.createScaledBitmap(bmp, size, size, true);
-            Bitmap circularBmp = getCircularBitmap(scaledBmp); 
-            
-            heroIconCache.put(searchKey, circularBmp);
-            return circularBmp;
-            
-        } catch (Exception e) {
-            heroIconCache.put(searchKey, null);
-            return null;
-        }
+        heroIconCache.put(searchKey, circularBmp);
+        return circularBmp;
     }
 
     private void startSocketThread() {
