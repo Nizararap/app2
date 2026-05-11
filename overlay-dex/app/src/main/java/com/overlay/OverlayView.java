@@ -321,7 +321,35 @@ public class OverlayView extends LinearLayout {
         }));
 
         // ---------- LOCK HERO ----------
+        // ---------- LOCK HERO ----------
         t.addView(card(ctx, l -> {
+            l.addView(secTitle(ctx, "LOCK HERO"));
+            l.addView(toggleRow(ctx, "Enable Hero Lock", "Prioritize specific target", "lock_hero_enable", false));
+            
+            String currentHero = prefs.getString("locked_hero_name", "");
+            if (currentHero.isEmpty()) currentHero = "None";
+
+            final TextView[] btnHeroRef = new TextView[1];
+            
+            btnHeroRef[0] = (TextView) btn(ctx, "Pilih Hero:[" + currentHero + "]", C_BTN_DRK, () -> {
+                java.util.List<String> listHero = radar.getActiveEnemyNames();
+                if (listHero.isEmpty()) {
+                    android.widget.Toast.makeText(ctx, "Musuh belum terdeteksi di Map!", android.widget.Toast.LENGTH_SHORT).show();
+                } else {
+                    String[] items = listHero.toArray(new String[0]);
+                    // MENGGUNAKAN CUSTOM DIALOG MODERN
+                    showModernDialog(ctx, "TARGET LOCK HERO", items, selected -> {
+                        prefs.edit().putString("locked_hero_name", selected).apply();
+                        if (btnHeroRef[0] != null) btnHeroRef[0].setText("Pilih Hero: [" + selected + "]");
+                        sendConfigToCpp(prefs);
+                    });
+                }
+            });
+            l.addView(btnHeroRef[0]);
+        }));
+
+        // ---------- HERO LOCK ----------
+     t.addView(card(ctx, l -> {
             l.addView(secTitle(ctx, "LOCK HERO"));
             l.addView(toggleRow(ctx, "Enable Hero Lock", "Prioritize specific target", "lock_hero_enable", false));
             
@@ -524,7 +552,7 @@ public class OverlayView extends LinearLayout {
         r.addView(tc);
         r.addView(buildToggle(ctx, prefs.getBoolean(key, def), on -> {
             if (!authManager.isKeyValid()) {
-                android.widget.Toast.makeText(getContext(), "VIP Key Expired! Please Relogin.", android.widget.Toast.LENGTH_SHORT).show();
+                android.widget.Toast.makeText(getContext(), " Key Expired! Please Relogin.", android.widget.Toast.LENGTH_SHORT).show();
                 return;
             }
             prefs.edit().putBoolean(key, on).apply();
@@ -535,23 +563,54 @@ public class OverlayView extends LinearLayout {
     }
 
     private View checkRow(Context ctx, String title, String key, boolean def) {
-        LinearLayout r = new LinearLayout(ctx); r.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout r = new LinearLayout(ctx); 
+        r.setGravity(Gravity.CENTER_VERTICAL);
         r.setPadding(0, dp(6), 0, dp(6));
+        
         boolean init = prefs.getBoolean(key, def);
         final boolean[] st = {init};
-        TextView dot = new TextView(ctx); dot.setTextSize(14f); dot.setPadding(0,0,dp(8),0);
-        dot.setText(init ? "◉" : "○"); dot.setTextColor(init ? C_ACCENT : C_SUBTEXT);
-        TextView lbl = new TextView(ctx); lbl.setText(title); lbl.setTextColor(C_TEXT); lbl.setTextSize(12f);
-        r.addView(dot); r.addView(lbl);
+
+        // Custom Modern Checkbox Box (Bentuk Kotak)
+        TextView box = new TextView(ctx);
+        box.setLayoutParams(new LayoutParams(dp(18), dp(18)));
+        box.setGravity(Gravity.CENTER);
+        box.setTextSize(11f);
+        box.setTypeface(null, Typeface.BOLD);
+
+        Runnable updateBox = () -> {
+            GradientDrawable bg = new GradientDrawable();
+            bg.setCornerRadius(dp(4));
+            if (st[0]) {
+                bg.setColor(C_ACCENT); // Full warna biru jika on
+                box.setText("✓");
+                box.setTextColor(C_BG); // Warna centang gelap
+            } else {
+                bg.setColor(C_BG);
+                bg.setStroke(dp(1), C_SUBTEXT); // Border saja jika off
+                box.setText("");
+            }
+            box.setBackground(bg);
+        };
+        updateBox.run();
+
+        TextView lbl = new TextView(ctx); 
+        lbl.setText(title); 
+        lbl.setTextColor(C_TEXT); 
+        lbl.setTextSize(12f);
+        LayoutParams llp = new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
+        llp.setMargins(dp(10), 0, 0, 0);
+        lbl.setLayoutParams(llp);
+
+        r.addView(box); r.addView(lbl);
         r.setOnClickListener(v -> {
             if (!authManager.isKeyValid()) {
-                android.widget.Toast.makeText(getContext(), "VIP Key Expired! Please Relogin.", android.widget.Toast.LENGTH_SHORT).show();
+                android.widget.Toast.makeText(getContext(), " Key Expired! Please Relogin.", android.widget.Toast.LENGTH_SHORT).show();
                 return;
             }
             st[0] = !st[0];
             prefs.edit().putBoolean(key, st[0]).apply();
             sendConfigToCpp(prefs);
-            dot.setText(st[0] ? "◉" : "○"); dot.setTextColor(st[0] ? C_ACCENT : C_SUBTEXT);
+            updateBox.run(); // Animasi update centang
             radar.invalidate();
         });
         return r;
@@ -681,9 +740,9 @@ public class OverlayView extends LinearLayout {
     private void showExpanded()  { tvPill.setVisibility(GONE); panel.setVisibility(VISIBLE); }
     private String formatTime(long seconds) {
         if (seconds <= 0) return "Expired";
-        if (seconds > 86400) return (seconds / 86400) + " Hari";
-        if (seconds > 3600) return (seconds / 3600) + " Jam";
-        return (seconds / 60) + " Menit";
+        if (seconds > 86400) return (seconds / 86400) + " Day";
+        if (seconds > 3600) return (seconds / 3600) + " O'clock";
+        return (seconds / 60) + " Minute";
     }
 
     private int dp(int v) { return (int)(v * getContext().getResources().getDisplayMetrics().density); }
@@ -723,6 +782,83 @@ public class OverlayView extends LinearLayout {
             return false;
         }
     };
+    
+// Interface untuk aksi dialog
+    public interface DialogCallback {
+        void onSelect(String item);
+    }
+
+    // Custom UI Dialog Floating Ala Premium Mod
+    private void showModernDialog(Context ctx, String title, String[] items, final DialogCallback callback) {
+        final FrameLayout dimBg = new FrameLayout(ctx);
+        dimBg.setBackgroundColor(Color.argb(180, 0, 0, 0)); // Background gelap blur
+        dimBg.setOnClickListener(v -> { try { wm.removeView(dimBg); } catch (Exception ignored) {} }); // Klik luar untuk tutup
+
+        LinearLayout card = new LinearLayout(ctx);
+        card.setOrientation(VERTICAL);
+        GradientDrawable gd = new GradientDrawable();
+        gd.setColor(C_CARD);
+        gd.setCornerRadius(dp(16));
+        gd.setStroke(dp(1), Color.argb(80, 0, 212, 255)); // Border neon tipis
+        card.setBackground(gd);
+        card.setPadding(dp(20), dp(20), dp(20), dp(20));
+        
+        // Agar klik di card tidak ikut menutup dialog (menahan event dari dimBg)
+        card.setOnClickListener(v -> {});
+
+        TextView tvTitle = new TextView(ctx);
+        tvTitle.setText(title);
+        tvTitle.setTextColor(C_ACCENT);
+        tvTitle.setTextSize(15f);
+        tvTitle.setTypeface(null, Typeface.BOLD);
+        tvTitle.setGravity(Gravity.CENTER);
+        tvTitle.setPadding(0, 0, 0, dp(15));
+        card.addView(tvTitle);
+
+        ScrollView sv = new ScrollView(ctx);
+        LinearLayout list = new LinearLayout(ctx);
+        list.setOrientation(VERTICAL);
+
+        for (final String item : items) {
+            TextView btn = new TextView(ctx);
+            btn.setText(item);
+            btn.setTextColor(C_TEXT);
+            btn.setPadding(dp(12), dp(12), dp(12), dp(12));
+            btn.setTextSize(13f);
+            btn.setGravity(Gravity.CENTER);
+            btn.setTypeface(null, Typeface.BOLD);
+
+            GradientDrawable bbg = new GradientDrawable();
+            bbg.setColor(C_BG);
+            bbg.setCornerRadius(dp(8));
+            btn.setBackground(bbg);
+
+            LayoutParams blp = new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
+            blp.setMargins(0, 0, 0, dp(8));
+            btn.setLayoutParams(blp);
+
+            btn.setOnClickListener(v -> {
+                try { wm.removeView(dimBg); } catch (Exception ignored) {}
+                callback.onSelect(item);
+            });
+            list.addView(btn);
+        }
+        sv.addView(list);
+
+        LayoutParams svLp = new LayoutParams(dp(240), LayoutParams.WRAP_CONTENT);
+        card.addView(sv, svLp);
+
+        FrameLayout.LayoutParams cardLp = new FrameLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
+        cardLp.gravity = Gravity.CENTER;
+        dimBg.addView(card, cardLp);
+
+        int type = (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) ? WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY : WindowManager.LayoutParams.TYPE_PHONE;
+        WindowManager.LayoutParams lp = new WindowManager.LayoutParams(
+                WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.MATCH_PARENT,
+                type, WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE, PixelFormat.TRANSLUCENT
+        );
+        try { wm.addView(dimBg, lp); } catch (Exception ignored) {}
+    }
 
     // ==================== PENGIRIMAN SOCKET KE C++ ====================
     private void sendConfigToCpp(SharedPreferences prefs) {
@@ -749,7 +885,8 @@ bb.putLong(expirySeconds * 1000); // KIRIM DALAM MILIDETIK
                 int activeCombo = 0;
                 if (selectedCombo.equals("gusion")) activeCombo = 1;
                 else if (selectedCombo.equals("kadita")) activeCombo = 2;
-                else if (selectedCombo.equals("beatrix")) activeCombo = 3;
+                else if (selectedCombo.equals("beatrix ultimate lock")) activeCombo = 3;
+                else if (selectedCombo.equals("kimmy auto (maybe bug)")) activeCombo = 4; 
 
                 bb.putInt(prefs.getBoolean("aimbot_enable", false) ? 1 : 0);
                 bb.putInt(lingManual);

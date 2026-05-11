@@ -171,13 +171,17 @@ public class RadarView extends View {
     private void startSocketThread() {
         new Thread(() -> {
             while (isRunning) {
+                LocalSocket socket = null;
+                DataInputStream dis = null;
                 try {
-                    LocalSocket socket = new LocalSocket();
+                    socket = new LocalSocket();
                     socket.connect(new LocalSocketAddress("mlbb_radar_socket", LocalSocketAddress.Namespace.ABSTRACT));
-                    DataInputStream dis = new DataInputStream(socket.getInputStream());
+                    dis = new DataInputStream(socket.getInputStream());
 
                     byte[] countBuffer = new byte[4];
-                    byte[] packetBuffer = new byte[48];
+                    // PERBAIKAN UKURAN BYTE (Sesuai dengan struct C++ 40 byte = x,y,z(12) + camp(4) + name(24)? Cek struct, tapi Anda pakai 48)
+                    // Pastikan ukuran ini pas dengan sizeof(PlayerDataPacket) di C++ (44 atau 48).
+                    byte[] packetBuffer = new byte[48]; 
 
                     while (isRunning) {
                         dis.readFully(countBuffer);
@@ -210,6 +214,10 @@ public class RadarView extends View {
                     }
                 } catch (Exception e) {
                     try { Thread.sleep(1000); } catch (InterruptedException ignored) {}
+                } finally {
+                    // PENTING: Wajib menutup socket di blok finally agar tidak terjadi Memory/FD Leak!
+                    try { if (dis != null) dis.close(); } catch (Exception ignored) {}
+                    try { if (socket != null) socket.close(); } catch (Exception ignored) {}
                 }
             }
         }).start();
