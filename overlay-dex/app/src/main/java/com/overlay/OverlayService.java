@@ -21,7 +21,12 @@ public class OverlayService extends Service {
     private Handler handler;
     private Runnable connectionChecker;
     private boolean isOverlayShown = false;
+    private boolean isLoginShown = false;
+    private LoginView loginView;
+    private KeyAuthManager authManager;
     private Thread monitorThread;
+    private Handler expiryHandler = new Handler(Looper.getMainLooper());
+    private Runnable expiryChecker;
 
     private static final int RETRY_DELAY_MS = 1500;
     private static final int MONITOR_INTERVAL_MS = 3000;
@@ -40,8 +45,74 @@ public class OverlayService extends Service {
 
         windowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
         handler = new Handler(Looper.getMainLooper());
+        authManager = new KeyAuthManager(this);
 
-        startConnectionChecker();
+        checkAuthAndStart();
+    }
+
+    private void checkAuthAndStart() {
+        if (authManager.isKeyValid()) {
+            startConnectionChecker();
+            startExpiryMonitor();
+        } else {
+            showLoginUI();
+        }
+    }
+
+    private void showLoginUI() {
+        if (isLoginShown) return;
+        isLoginShown = true;
+
+        int type = (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
+                ? WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+                : WindowManager.LayoutParams.TYPE_PHONE;
+
+        WindowManager.LayoutParams loginParams = new WindowManager.LayoutParams(
+                WindowManager.LayoutParams.MATCH_PARENT,
+                WindowManager.LayoutParams.MATCH_PARENT,
+                type,
+                WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL | WindowManager.LayoutParams.FLAG_DIM_BEHIND,
+                PixelFormat.TRANSLUCENT
+        );
+        loginParams.dimAmount = 0.6f;
+
+        loginView = new LoginView(this, windowManager, loginParams, () -> {
+            hideLoginUI();
+            checkAuthAndStart();
+        });
+
+        windowManager.addView(loginView, loginParams);
+    }
+
+    private void hideLoginUI() {
+        if (isLoginShown && loginView != null) {
+            try {
+                windowManager.removeView(loginView);
+            } catch (Exception ignored) {}
+            isLoginShown = false;
+            loginView = null;
+        }
+    }
+
+    private void startExpiryMonitor() {
+        if (expiryChecker != null) expiryHandler.removeCallbacks(expiryChecker);
+        
+        expiryChecker = new Runnable() {
+            @Override
+            public void run() {
+                if (!authManager.isKeyValid()) {
+                    // Key Expired!
+                    authManager.logout();
+                    hideOverlayUI();
+                    showLoginUI();
+                    android.widget.Toast.makeText(OverlayService.this, "VIP Key Expired!", android.widget.Toast.LENGTH_LONG).show();
+                } else {
+                    // Cek setiap 30 detik
+                    expiryHandler.postDelayed(this, 30000);
+                }
+            }
+        };
+        expiryHandler.post(expiryChecker);
     }
 
     private void startConnectionChecker() {
@@ -168,7 +239,9 @@ public class OverlayService extends Service {
     public void onDestroy() {
         super.onDestroy();
         handler.removeCallbacks(connectionChecker);
+        expiryHandler.removeCallbacks(expiryChecker);
         if (monitorThread != null) monitorThread.interrupt();
         hideOverlayUI();
+        hideLoginUI();
     }
 }

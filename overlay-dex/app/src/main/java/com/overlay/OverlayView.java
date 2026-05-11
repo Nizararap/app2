@@ -1,22 +1,17 @@
 package com.overlay;
 
 import android.content.Context;
-import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
-import android.net.Uri;
 import android.os.Build;
-import android.os.Handler;
-import android.os.Looper;
 import android.util.DisplayMetrics;
 import android.view.Display;
 import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.WindowManager;
-import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.HorizontalScrollView;
 import android.widget.LinearLayout;
@@ -25,16 +20,6 @@ import android.widget.RadioGroup;
 import android.widget.ScrollView;
 import android.widget.SeekBar;
 import android.widget.TextView;
-import android.widget.Toast;
-
-import org.json.JSONObject;
-
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
-import java.net.HttpURLConnection;
-import java.net.URL;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
 
 public class OverlayView extends LinearLayout {
 
@@ -49,21 +34,13 @@ public class OverlayView extends LinearLayout {
     private static final int C_BTN_BLU = Color.parseColor("#1565C0");
     private static final int C_BTN_DRK = Color.parseColor("#1E1E28");
 
-    // ==============================================================
-    // GANTI DENGAN URL GITHUB RAW ANDA DAN LINK TELEGRAM ANDA
-    // ==============================================================
-    private static final String KEY_DB_URL = "https://raw.githubusercontent.com/Nizararap/Internal-keys/refs/heads/main/keys.json";
-    private static final String TELEGRAM_URL = "https://t.me/modfreew";
-
     private final WindowManager wm;
     private final WindowManager.LayoutParams lp;
     private final RadarView radar;
     private final SharedPreferences prefs;
+    private final KeyAuthManager authManager;
 
     private static final java.util.concurrent.ExecutorService socketExecutor = java.util.concurrent.Executors.newSingleThreadExecutor();
-    private static final java.util.concurrent.ExecutorService networkExecutor = java.util.concurrent.Executors.newSingleThreadExecutor();
-    private final Handler mainHandler = new Handler(Looper.getMainLooper());
-    private Runnable autoKickRunnable;
 
     private int realScreenW;
     private int realScreenH;
@@ -72,7 +49,7 @@ public class OverlayView extends LinearLayout {
     private int ix, iy;
     private boolean dragging;
 
-    private LinearLayout panelGroup, loginPanel, panel, tabDash, tabRad, tabCombat;
+    private LinearLayout panel, tabDash, tabRad, tabCombat;
     private TextView tvPill;
     private TextView[] tabBtns;
     private ScrollView scrollView;
@@ -83,196 +60,14 @@ public class OverlayView extends LinearLayout {
         this.lp    = lp;
         this.radar = radar;
         this.prefs = ctx.getSharedPreferences("mod_settings", Context.MODE_PRIVATE);
+        this.authManager = new KeyAuthManager(ctx);
         fetchRealScreenSize();
         setOrientation(VERTICAL);
-
         buildPill(ctx);
-        
-        // Container Utama untuk ganti-ganti antara Login / Menu Mod
-        panelGroup = new LinearLayout(ctx);
-        panelGroup.setOrientation(VERTICAL);
-        addView(panelGroup);
-
-        checkSessionAndStart(ctx);
+        buildPanel(ctx);
+        showExpanded();
+        sendConfigToCpp(this.prefs);
     }
-
-    private void enableKeyboard(boolean enable) {
-    if (enable) {
-        // Izinkan keyboard muncul
-        lp.flags &= ~WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE;
-        // Kirim sentuhan di luar panel ke aplikasi bawah
-        lp.flags |= WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL;
-    } else {
-        // Kembalikan ke mode tidak fokus & tidak modal
-        lp.flags |= WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE;
-        lp.flags &= ~WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL;
-    }
-    try { wm.updateViewLayout(this, lp); } catch (Exception ignored) {}
-}
-
-    private void checkSessionAndStart(Context ctx) {
-        long expiry = prefs.getLong("vip_expiry", 0);
-        long now = System.currentTimeMillis() / 1000;
-
-        panelGroup.removeAllViews();
-        if (expiry > now) {
-            // Jika sesi masih aktif
-            enableKeyboard(false);
-            buildMainPanel(ctx);
-            showExpanded();
-            startAutoKickTimer(ctx);
-            sendConfigToCpp(prefs);
-        } else {
-            // Jika belum login atau sesi habis
-            tvPill.setVisibility(VISIBLE);
-            enableKeyboard(true);
-            buildLoginPanel(ctx);
-        }
-    }
-
-    // ==========================================
-    // BAGIAN LOGIN PANEL & SECURITY
-    // ==========================================
-    private void buildLoginPanel(Context ctx) {
-        loginPanel = new LinearLayout(ctx);
-        loginPanel.setOrientation(VERTICAL);
-        loginPanel.setMinimumWidth(dp(300));
-        
-        GradientDrawable bg = new GradientDrawable();
-        bg.setColor(C_BG); bg.setCornerRadius(dp(14)); bg.setStroke(1, Color.argb(80, 0, 212, 255));
-        loginPanel.setBackground(bg);
-        loginPanel.setPadding(dp(20), dp(20), dp(20), dp(20));
-
-        TextView title = new TextView(ctx);
-        title.setText("LOGIN VIP"); title.setTextColor(C_ACCENT);
-        title.setTextSize(18f); title.setTypeface(null, Typeface.BOLD);
-        title.setGravity(Gravity.CENTER);
-        loginPanel.addView(title);
-        
-        loginPanel.addView(vgap(ctx, 15));
-
-        EditText inputKey = new EditText(ctx);
-        inputKey.setHint("Masukkan VIP Key..."); 
-        inputKey.setHintTextColor(C_SUBTEXT);
-        inputKey.setTextColor(Color.WHITE); 
-        inputKey.setTextSize(14f);
-        GradientDrawable ibg = new GradientDrawable();
-        ibg.setColor(C_CARD); ibg.setCornerRadius(dp(8));
-        inputKey.setBackground(ibg); 
-        inputKey.setPadding(dp(15), dp(15), dp(15), dp(15));
-        loginPanel.addView(inputKey);
-
-        loginPanel.addView(vgap(ctx, 15));
-
-        TextView btnLogin = (TextView) btn(ctx, "LOGIN SEKARANG", C_GREEN, () -> {
-            String key = inputKey.getText().toString().trim();
-            if(key.isEmpty()) { 
-                Toast.makeText(ctx, "Key tidak boleh kosong!", Toast.LENGTH_SHORT).show(); 
-                return; 
-            }
-            verifyKey(ctx, key);
-        });
-        btnLogin.setTextColor(Color.BLACK);
-        loginPanel.addView(btnLogin);
-
-        loginPanel.addView(btn(ctx, "GET KEY (Telegram)", C_BTN_DRK, () -> {
-            Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(TELEGRAM_URL));
-            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            ctx.startActivity(intent);
-        }));
-
-        panelGroup.addView(loginPanel);
-    }
-
-    private String sha256(String base) {
-        try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] hash = digest.digest(base.getBytes(StandardCharsets.UTF_8));
-            StringBuilder hexString = new StringBuilder();
-            for (byte b : hash) {
-                String hex = Integer.toHexString(0xff & b);
-                if (hex.length() == 1) hexString.append('0');
-                hexString.append(hex);
-            }
-            return hexString.toString();
-        } catch (Exception ex) {
-            throw new RuntimeException(ex);
-        }
-    }
-
-    private void verifyKey(Context ctx, String inputKey) {
-        Toast.makeText(ctx, "Mengecek Key ke Server...", Toast.LENGTH_SHORT).show();
-        networkExecutor.execute(() -> {
-            try {
-                String hash = sha256(inputKey);
-                URL url = new URL(KEY_DB_URL);
-                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-                conn.setConnectTimeout(5000);
-                conn.setRequestMethod("GET");
-                
-                BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream()));
-                StringBuilder json = new StringBuilder();
-                String line;
-                while ((line = reader.readLine()) != null) json.append(line);
-                reader.close();
-
-                JSONObject db = new JSONObject(json.toString());
-                
-                if (db.has(hash)) {
-                    long expiry = db.getLong(hash);
-                    long now = System.currentTimeMillis() / 1000;
-                    
-                    if (expiry > now) {
-                        prefs.edit().putLong("vip_expiry", expiry).apply();
-                        mainHandler.post(() -> {
-                            Toast.makeText(ctx, "Login Sukses!", Toast.LENGTH_SHORT).show();
-                            checkSessionAndStart(ctx); // Reload panel
-                        });
-                    } else {
-                        mainHandler.post(() -> Toast.makeText(ctx, "Key sudah Expired!", Toast.LENGTH_SHORT).show());
-                    }
-                } else {
-                    mainHandler.post(() -> Toast.makeText(ctx, "Key Invalid / Tidak ditemukan!", Toast.LENGTH_SHORT).show());
-                }
-            } catch (Exception e) {
-                mainHandler.post(() -> Toast.makeText(ctx, "Koneksi Gagal! Cek Internet/URL Github.", Toast.LENGTH_LONG).show());
-            }
-        });
-    }
-
-    private void startAutoKickTimer(Context ctx) {
-        if (autoKickRunnable != null) mainHandler.removeCallbacks(autoKickRunnable);
-        
-        autoKickRunnable = new Runnable() {
-            @Override
-            public void run() {
-                long expiry = prefs.getLong("vip_expiry", 0);
-                long now = System.currentTimeMillis() / 1000;
-                
-                if (now > expiry) {
-                    Toast.makeText(ctx, "Waktu VIP Anda telah habis!", Toast.LENGTH_LONG).show();
-                    prefs.edit().putLong("vip_expiry", 0).apply();
-                    
-                    // Matikan fitur C++ (Reset Config)
-                    prefs.edit().putBoolean("aimbot_enable", false).putBoolean("radar_enable", false).apply();
-                    sendConfigToCpp(prefs);
-                    radar.invalidate();
-                    
-                    // Kembali ke halaman Login
-                    checkSessionAndStart(ctx);
-                } else {
-                    // Cek lagi 60 detik kemudian
-                    mainHandler.postDelayed(this, 60000);
-                }
-            }
-        };
-        mainHandler.postDelayed(autoKickRunnable, 60000); // 1 Menit
-    }
-
-
-    // ==========================================
-    // BAGIAN MAIN PANEL (MOD MENU)
-    // ==========================================
 
     @SuppressWarnings("deprecation")
     private void fetchRealScreenSize() {
@@ -303,8 +98,7 @@ public class OverlayView extends LinearLayout {
         addView(tvPill);
     }
 
-    private void buildMainPanel(Context ctx) {
-        panelGroup.removeAllViews();
+    private void buildPanel(Context ctx) {
         panel = new LinearLayout(ctx);
         panel.setOrientation(VERTICAL);
         panel.setMinimumWidth(dp(310));
@@ -316,7 +110,7 @@ public class OverlayView extends LinearLayout {
         panel.addView(buildHeader(ctx));
         panel.addView(buildTabs(ctx));
         panel.addView(buildContent(ctx));
-        panelGroup.addView(panel);
+        addView(panel);
         switchTab(0);
     }
 
@@ -342,9 +136,13 @@ public class OverlayView extends LinearLayout {
         t1.setText("MLBB Radar Premium");
         t1.setTextColor(C_TEXT); t1.setTextSize(13f); t1.setTypeface(null, Typeface.BOLD);
         col.addView(t1);
+        
+        long rem = authManager.getRemainingTime();
+        String timeStr = formatTime(rem);
+        
         TextView t2 = new TextView(ctx);
-        t2.setText("Java Edition");
-        t2.setTextColor(C_SUBTEXT); t2.setTextSize(10f);
+        t2.setText("VIP Expire: " + timeStr);
+        t2.setTextColor(C_ACCENT); t2.setTextSize(10f);
         col.addView(t2);
         h.addView(col);
 
@@ -450,17 +248,12 @@ public class OverlayView extends LinearLayout {
         t.addView(card(ctx, l -> {
             l.addView(secTitle(ctx, "ACTIONS"));
             l.addView(btn(ctx, "Hide Menu", C_BTN_DRK, this::showCollapsed));
-            l.addView(btn(ctx, "Logout VIP", C_BTN_DRK, () -> {
-                prefs.edit().putLong("vip_expiry", 0).apply();
-                checkSessionAndStart(ctx);
-            }));
         }));
 
         t.addView(card(ctx, l -> {
             l.addView(secTitle(ctx, "CONFIG"));
             l.addView(btn(ctx, "Reset All Config", C_BTN_DRK, () -> {
-                long currentExpiry = prefs.getLong("vip_expiry", 0);
-                prefs.edit().clear().putLong("vip_expiry", currentExpiry).apply();
+                prefs.edit().clear().apply();
                 sendConfigToCpp(prefs);
                 refreshAllUI();
                 radar.invalidate();
@@ -565,6 +358,7 @@ public class OverlayView extends LinearLayout {
         }));
 
         // ---------- HERO COMBO ----------
+        // ---------- HERO COMBO ----------
         t.addView(card(ctx, l -> {
             l.addView(secTitle(ctx, "HERO COMBO"));
             
@@ -572,11 +366,12 @@ public class OverlayView extends LinearLayout {
             if (currentCombo.isEmpty() || currentCombo.equals("none")) currentCombo = "None";
             if (currentCombo.equals("gusion")) currentCombo = "Gusion";
             if (currentCombo.equals("kadita")) currentCombo = "Kadita";
-            if (currentCombo.equals("beatrix")) currentCombo = "Beatrix";
+            if (currentCombo.equals("beatrix")) currentCombo = "Beatrix"; // <--- TAMBAHAN BEATRIX
             
             final TextView[] btnComboRef = new TextView[1];
             
             btnComboRef[0] = (TextView) btn(ctx, "Pilih Combo: [" + currentCombo + "]", C_BTN_DRK, () -> {
+                // TAMBAHKAN BEATRIX DI DALAM ARRAY INI:
                 String[] comboList = {"None", "Gusion", "Kadita", "Beatrix"}; 
                 android.app.AlertDialog dialog = new android.app.AlertDialog.Builder(ctx, android.app.AlertDialog.THEME_DEVICE_DEFAULT_DARK)
                     .setTitle("Pilih Hero Combo")
@@ -586,7 +381,7 @@ public class OverlayView extends LinearLayout {
                         prefs.edit().putString("selected_combo", valueToSave).apply();
                         
                         if (btnComboRef[0] != null) {
-                            btnComboRef[0].setText("Pilih Combo:[" + selected + "]");
+                            btnComboRef[0].setText("Pilih Combo: [" + selected + "]");
                         }
                         sendConfigToCpp(prefs);
                     })
@@ -723,6 +518,10 @@ public class OverlayView extends LinearLayout {
         }
         r.addView(tc);
         r.addView(buildToggle(ctx, prefs.getBoolean(key, def), on -> {
+            if (!authManager.isKeyValid()) {
+                android.widget.Toast.makeText(getContext(), "VIP Key Expired! Please Relogin.", android.widget.Toast.LENGTH_SHORT).show();
+                return;
+            }
             prefs.edit().putBoolean(key, on).apply();
             sendConfigToCpp(prefs);
             radar.invalidate();
@@ -740,6 +539,10 @@ public class OverlayView extends LinearLayout {
         TextView lbl = new TextView(ctx); lbl.setText(title); lbl.setTextColor(C_TEXT); lbl.setTextSize(12f);
         r.addView(dot); r.addView(lbl);
         r.setOnClickListener(v -> {
+            if (!authManager.isKeyValid()) {
+                android.widget.Toast.makeText(getContext(), "VIP Key Expired! Please Relogin.", android.widget.Toast.LENGTH_SHORT).show();
+                return;
+            }
             st[0] = !st[0];
             prefs.edit().putBoolean(key, st[0]).apply();
             sendConfigToCpp(prefs);
@@ -862,16 +665,15 @@ public class OverlayView extends LinearLayout {
         return v;
     }
 
-    private void showCollapsed() { 
-        if (panel != null) panel.setVisibility(GONE); 
-        tvPill.setVisibility(VISIBLE); 
+    private void showCollapsed() { panel.setVisibility(GONE); tvPill.setVisibility(VISIBLE); }
+    private void showExpanded()  { tvPill.setVisibility(GONE); panel.setVisibility(VISIBLE); }
+    private String formatTime(long seconds) {
+        if (seconds <= 0) return "Expired";
+        if (seconds > 86400) return (seconds / 86400) + " Hari";
+        if (seconds > 3600) return (seconds / 3600) + " Jam";
+        return (seconds / 60) + " Menit";
     }
-    
-    private void showExpanded()  { 
-        tvPill.setVisibility(GONE); 
-        if (panel != null) panel.setVisibility(VISIBLE); 
-    }
-    
+
     private int dp(int v) { return (int)(v * getContext().getResources().getDisplayMetrics().density); }
 
     private final OnTouchListener dragL = new OnTouchListener() {
@@ -924,22 +726,24 @@ public class OverlayView extends LinearLayout {
                 int lingManual = (lingMode == 1) ? 1 : 0;
                 int lingAuto   = (lingMode == 2) ? 1 : 0;
 
+              // --- BAGIAN YANG DIUBAH UNTUK MULTI-COMBO ---
                 String selectedCombo = prefs.getString("selected_combo", "none");
                 int activeCombo = 0;
                 if (selectedCombo.equals("gusion")) activeCombo = 1;
                 else if (selectedCombo.equals("kadita")) activeCombo = 2;
-                else if (selectedCombo.equals("beatrix")) activeCombo = 3;
+                else if (selectedCombo.equals("beatrix")) activeCombo = 3; // <--- TAMBAHAN BEATRIX
 
-                bb.putInt(prefs.getBoolean("aimbot_enable", false) ? 1 : 0);
-                bb.putInt(lingManual);
-                bb.putInt(lingAuto);
-                bb.putInt(activeCombo);
-                bb.putInt(prefs.getInt("aimbot_target", 0));
-                bb.putFloat(prefs.getFloat("aimbot_fov", 200f));
-                bb.putInt(prefs.getBoolean("retri_buff", false) ? 1 : 0);
-                bb.putInt(prefs.getBoolean("retri_lord", false) ? 1 : 0);
-                bb.putInt(prefs.getBoolean("retri_turtle", false) ? 1 : 0);
-                bb.putInt(prefs.getBoolean("retri_litho", false) ? 1 : 0);
+                bb.putInt(prefs.getBoolean("aimbot_enable", false) ? 1 : 0); // aimbot
+                bb.putInt(lingManual);                                       // ling_manual
+                bb.putInt(lingAuto);                                         // ling_auto
+                bb.putInt(activeCombo);                                      // active_combo (dikirim ke C++)
+                bb.putInt(prefs.getInt("aimbot_target", 0));                 // target_mode
+                bb.putFloat(prefs.getFloat("aimbot_fov", 200f));             // fov
+                bb.putInt(prefs.getBoolean("retri_buff", false) ? 1 : 0);    // retri_buff
+                bb.putInt(prefs.getBoolean("retri_lord", false) ? 1 : 0);    // retri_lord
+                bb.putInt(prefs.getBoolean("retri_turtle", false) ? 1 : 0);  // retri_turtle
+                bb.putInt(prefs.getBoolean("retri_litho", false) ? 1 : 0);   // retri_litho
+                
                 bb.putInt(prefs.getBoolean("lock_hero_enable", false) ? 1 : 0);
                 
                 String heroName = prefs.getString("locked_hero_name", "");
@@ -953,7 +757,7 @@ public class OverlayView extends LinearLayout {
                 out.write(bb.array());
                 out.flush();
                 socket.close();
-            } catch (Exception ignored) {}
+            } catch (Exception e) {}
         });
     }
 }
