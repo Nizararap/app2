@@ -151,41 +151,49 @@ public class LoginView extends LinearLayout {
         etKey.setLayoutParams(etLp);
         inputArea.addView(etKey);
 
-        // Paste Button
-        TextView btnPaste = new TextView(ctx);
-        btnPaste.setText("PASTE");
-        btnPaste.setTextColor(Color.BLACK);
-        btnPaste.setTextSize(11f);
-        btnPaste.setTypeface(null, Typeface.BOLD);
-        btnPaste.setGravity(Gravity.CENTER);
-        btnPaste.setPadding(dp(10), dp(8), dp(10), dp(8));
-        
-        GradientDrawable pBg = new GradientDrawable();
-        pBg.setColor(C_ACCENT);
-        pBg.setCornerRadius(dp(5));
-        btnPaste.setBackground(pBg);
-        
-        LayoutParams pLp = new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
-        pLp.setMargins(dp(8), 0, 0, 0);
-        btnPaste.setLayoutParams(pLp);
-        
-        btnPaste.setOnClickListener(v -> {
-            try {
-                ClipboardManager clipboard = (ClipboardManager) ctx.getSystemService(Context.CLIPBOARD_SERVICE);
-                if (clipboard != null && clipboard.hasPrimaryClip()) {
-                    CharSequence text = clipboard.getPrimaryClip().getItemAt(0).getText();
-                    if (text != null) {
-                        etKey.setText(text.toString().trim());
-                        Toast.makeText(ctx, "Pasted!", Toast.LENGTH_SHORT).show();
-                    }
-                } else {
-                    Toast.makeText(ctx, "Clipboard empty!", Toast.LENGTH_SHORT).show();
-                }
-            } catch (Exception e) {
-                Toast.makeText(ctx, "Paste failed!", Toast.LENGTH_SHORT).show();
+  // Paste Button
+TextView btnPaste = new TextView(ctx);
+btnPaste.setText("PASTE");
+btnPaste.setTextColor(Color.BLACK);
+btnPaste.setTextSize(11f);
+btnPaste.setTypeface(null, Typeface.BOLD);
+btnPaste.setGravity(Gravity.CENTER);
+btnPaste.setPadding(dp(10), dp(8), dp(10), dp(8));
+
+GradientDrawable pBg = new GradientDrawable();
+pBg.setColor(C_ACCENT);
+pBg.setCornerRadius(dp(5));
+btnPaste.setBackground(pBg);
+
+LayoutParams pLp = new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
+pLp.setMargins(dp(8), 0, 0, 0);
+btnPaste.setLayoutParams(pLp);
+
+// FIX: Tangani sentuhan secara mandiri agar tidak di-intercept oleh drag listener
+btnPaste.setOnTouchListener((v, event) -> {
+    if (event.getAction() == MotionEvent.ACTION_UP) {
+        v.performClick();
+    }
+    return true; // Konsumsi event, cegah dragL ikut campur
+});
+
+btnPaste.setOnClickListener(v -> {
+    try {
+        ClipboardManager clipboard = (ClipboardManager) ctx.getSystemService(Context.CLIPBOARD_SERVICE);
+        if (clipboard != null && clipboard.hasPrimaryClip()) {
+            CharSequence text = clipboard.getPrimaryClip().getItemAt(0).getText();
+            if (text != null) {
+                etKey.setText(text.toString().trim());
+                Toast.makeText(ctx, "Pasted!", Toast.LENGTH_SHORT).show();
             }
-        });
-        inputArea.addView(btnPaste);
+        } else {
+            Toast.makeText(ctx, "Clipboard empty!", Toast.LENGTH_SHORT).show();
+        }
+    } catch (Exception e) {
+        Toast.makeText(ctx, "Paste failed!", Toast.LENGTH_SHORT).show();
+    }
+});
+inputArea.addView(btnPaste);
         
         loginCard.addView(inputArea);
 
