@@ -335,7 +335,7 @@ public class OverlayView extends LinearLayout {
             btnHeroRef[0] = (TextView) btn(ctx, "Pilih Hero:[" + currentHero + "]", C_BTN_DRK, () -> {
                 java.util.List<String> listHero = radar.getActiveEnemyNames();
                 if (listHero.isEmpty()) {
-                    android.widget.Toast.makeText(ctx, "Musuh belum terdeteksi di Map!", android.widget.Toast.LENGTH_SHORT).show();
+                    android.widget.Toast.makeText(ctx, "Enemy not detected yet!", android.widget.Toast.LENGTH_SHORT).show();
                 } else {
                     String[] items = listHero.toArray(new String[0]);
                     // MENGGUNAKAN CUSTOM DIALOG MODERN
@@ -349,83 +349,31 @@ public class OverlayView extends LinearLayout {
             l.addView(btnHeroRef[0]);
         }));
 
-        // ---------- HERO LOCK ----------
-     t.addView(card(ctx, l -> {
-            l.addView(secTitle(ctx, "LOCK HERO"));
-            l.addView(toggleRow(ctx, "Enable Hero Lock", "Prioritize specific target", "lock_hero_enable", false));
-            
-            String currentHero = prefs.getString("locked_hero_name", "");
-            if (currentHero.isEmpty()) currentHero = "None";
-
-            final TextView[] btnHeroRef = new TextView[1];
-            
-            btnHeroRef[0] = (TextView) btn(ctx, "Pilih Hero:[" + currentHero + "]", C_BTN_DRK, () -> {
-                java.util.List<String> listHero = radar.getActiveEnemyNames();
-                if (listHero.isEmpty()) {
-                    android.widget.Toast.makeText(ctx, "Tidak ada musuh terdeteksi (Tunggu muncul di map)", android.widget.Toast.LENGTH_SHORT).show();
-                } else {
-                    String[] items = listHero.toArray(new String[0]);
-                    
-                    android.app.AlertDialog dialog = new android.app.AlertDialog.Builder(ctx, android.app.AlertDialog.THEME_DEVICE_DEFAULT_DARK)
-                        .setTitle("Pilih Target Hero")
-                        .setItems(items, (d, which) -> {
-                            String selected = items[which];
-                            prefs.edit().putString("locked_hero_name", selected).apply();
-                            
-                            if (btnHeroRef[0] != null) {
-                                btnHeroRef[0].setText("Pilih Hero: [" + selected + "]");
-                            }
-                            sendConfigToCpp(prefs);
-                        })
-                        .create();
-                    
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                        dialog.getWindow().setType(android.view.WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY);
-                    } else {
-                        dialog.getWindow().setType(android.view.WindowManager.LayoutParams.TYPE_PHONE);
-                    }
-                    
-                    dialog.show();
-                }
-            });
-            l.addView(btnHeroRef[0]);
-        }));
 
         // ---------- HERO COMBO ----------
-        t.addView(card(ctx, l -> {
-            l.addView(secTitle(ctx, "HERO COMBO"));
+           t.addView(card(ctx, l -> {
+            l.addView(secTitle(ctx, "HERO SETTING"));
             
             String currentCombo = prefs.getString("selected_combo", "none");
             if (currentCombo.isEmpty() || currentCombo.equals("none")) currentCombo = "None";
             if (currentCombo.equals("gusion")) currentCombo = "Gusion";
             if (currentCombo.equals("kadita")) currentCombo = "Kadita";
             if (currentCombo.equals("beatrix")) currentCombo = "Beatrix";
+            if (currentCombo.equals("kimmy")) currentCombo = "Kimmy"; // <-- MAPPING STRING KIMMY
             
             final TextView[] btnComboRef = new TextView[1];
             
-            btnComboRef[0] = (TextView) btn(ctx, "Pilih Combo: [" + currentCombo + "]", C_BTN_DRK, () -> {
-                String[] comboList = {"None", "Gusion", "Kadita", "Beatrix"};
-                android.app.AlertDialog dialog = new android.app.AlertDialog.Builder(ctx, android.app.AlertDialog.THEME_DEVICE_DEFAULT_DARK)
-                    .setTitle("Pilih Hero Combo")
-                    .setItems(comboList, (d, which) -> {
-                        String selected = comboList[which];
-                        String valueToSave = selected.equals("None") ? "none" : selected.toLowerCase();
-                        prefs.edit().putString("selected_combo", valueToSave).apply();
-                        
-                        if (btnComboRef[0] != null) {
-                            btnComboRef[0].setText("Pilih Combo: [" + selected + "]");
-                        }
-                        sendConfigToCpp(prefs);
-                    })
-                    .create();
+            btnComboRef[0] = (TextView) btn(ctx, "Select Combo: [" + currentCombo + "]", C_BTN_DRK, () -> {
+                // TAMBAHAN KIMMY KE ARRAY LIST MENU
+                String[] comboList = {"None", "Gusion", "Kadita", "Beatrix(ultimate lock)", "Kimmy auto (maybe bug)"};
                 
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    dialog.getWindow().setType(android.view.WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY);
-                } else {
-                    dialog.getWindow().setType(android.view.WindowManager.LayoutParams.TYPE_PHONE);
-                }
-                
-                dialog.show();
+                // MENGGUNAKAN CUSTOM DIALOG MODERN
+                showModernDialog(ctx, "PILIH HERO COMBO", comboList, selected -> {
+                    String valueToSave = selected.equals("None") ? "none" : selected.toLowerCase();
+                    prefs.edit().putString("selected_combo", valueToSave).apply();
+                    if (btnComboRef[0] != null) btnComboRef[0].setText("Pilih Combo:[" + selected + "]");
+                    sendConfigToCpp(prefs);
+                });
             });
             l.addView(btnComboRef[0]);
         }));
@@ -886,8 +834,9 @@ bb.putLong(expirySeconds * 1000); // KIRIM DALAM MILIDETIK
                 int activeCombo = 0;
                 if (selectedCombo.equals("gusion")) activeCombo = 1;
                 else if (selectedCombo.equals("kadita")) activeCombo = 2;
-                else if (selectedCombo.equals("beatrix ultimate lock")) activeCombo = 3;
-                else if (selectedCombo.equals("kimmy auto (maybe bug)")) activeCombo = 4; 
+                else if (selectedCombo.equals("beatrix")) activeCombo = 3;
+                else if (selectedCombo.equals("kimmy")) activeCombo = 4; 
+
 
                 bb.putInt(prefs.getBoolean("aimbot_enable", false) ? 1 : 0);
                 bb.putInt(lingManual);
