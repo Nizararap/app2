@@ -12,24 +12,25 @@ import android.os.Looper;
 import android.provider.Settings;
 import android.view.Gravity;
 import android.view.WindowManager;
+import android.widget.Toast;
 
 public class OverlayService extends Service {
     private WindowManager windowManager;
     private OverlayView overlayView;
     private RadarView radarView;
+    private LoginView loginView;
+    private KeyAuthManager authManager;
 
     private Handler handler;
     private Runnable connectionChecker;
+    private Handler securityHandler = new Handler(Looper.getMainLooper());
+    private Runnable sessionMonitor;
+
     private boolean isOverlayShown = false;
     private boolean isLoginShown = false;
-    private LoginView loginView;
-    private KeyAuthManager authManager;
-    private Thread monitorThread;
-    private Handler expiryHandler = new Handler(Looper.getMainLooper());
-    private Runnable expiryChecker;
-
-    private static final int RETRY_DELAY_MS = 1500;
-    private static final int MONITOR_INTERVAL_MS = 3000;
+    
+    private static final long SESSION_LIMIT = 5 * 60 * 60 * 1000; // 5 Jam
+    private static final int RETRY_DELAY_MS = 2000;
 
     @Override
     public void onCreate() {
@@ -47,16 +48,44 @@ public class OverlayService extends Service {
         handler = new Handler(Looper.getMainLooper());
         authManager = new KeyAuthManager(this);
 
-        checkAuthAndStart();
+        checkInitialSession();
     }
 
-    private void checkAuthAndStart() {
-        if (authManager.isKeyValid()) {
+    private void checkInitialSession() {
+        if (isSessionValid()) {
             startConnectionChecker();
-            startExpiryMonitor();
+            startSessionMonitor();
         } else {
             showLoginUI();
         }
+    }
+
+    private boolean isSessionValid() {
+        if (!SecureSession.isSessionFileExists(this)) return false;
+        long timestamp = SecureSession.getSessionTimestamp(this);
+        return (System.currentTimeMillis() - timestamp) < SESSION_LIMIT;
+    }
+
+    private void startSessionMonitor() {
+        if (sessionMonitor != null) securityHandler.removeCallbacks(sessionMonitor);
+        sessionMonitor = new Runnable() {
+            @Override
+            public void run() {
+                if (!isSessionValid()) {
+                    forceLogout("Sesi berakhir atau file keamanan dihapus!");
+                } else {
+                    securityHandler.postDelayed(this, 30000); // Cek tiap 30 detik
+                }
+            }
+        };
+        securityHandler.post(sessionMonitor);
+    }
+
+    private void forceLogout(String reason) {
+        authManager.logout();
+        hideOverlayUI();
+        showLoginUI();
+        Toast.makeText(this, reason, Toast.LENGTH_LONG).show();
     }
 
     private void showLoginUI() {
@@ -66,77 +95,68 @@ public class OverlayService extends Service {
                 ? WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
                 : WindowManager.LayoutParams.TYPE_PHONE;
 
-        WindowManager.LayoutParams loginParams = new WindowManager.LayoutParams(
+        WindowManager.LayoutParams lp = new WindowManager.LayoutParams(
                 WindowManager.LayoutParams.WRAP_CONTENT,
                 WindowManager.LayoutParams.WRAP_CONTENT,
                 type,
                 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
                 PixelFormat.TRANSLUCENT
         );
-        loginParams.gravity = Gravity.CENTER;
-        loginParams.x = 0;
-        loginParams.y = 0;
+        lp.gravity = Gravity.CENTER;
 
-        loginView = new LoginView(this, windowManager, loginParams, () -> {
+        loginView = new LoginView(this, windowManager, lp, () -> {
             hideLoginUI();
-            checkAuthAndStart();
+            checkInitialSession();
         });
 
         try {
-            windowManager.addView(loginView, loginParams);
+            windowManager.addView(loginView, lp);
             isLoginShown = true;
-        } catch (Exception e) {
-            isLoginShown = false;
-        }
+        } catch (Exception ignored) {}
     }
 
     private void hideLoginUI() {
         if (isLoginShown && loginView != null) {
-            try {
-                windowManager.removeView(loginView);
-            } catch (Exception ignored) {}
+            try { windowManager.removeView(loginView); } catch (Exception ignored) {}
             isLoginShown = false;
             loginView = null;
         }
     }
 
-    private void startExpiryMonitor() {
-        if (expiryChecker != null) expiryHandler.removeCallbacks(expiryChecker);
-        
-        expiryChecker = new Runnable() {
-            @Override
-            public void run() {
-                if (!authManager.isKeyValid()) {
-                    // Key Expired!
-                    authManager.logout();
-                    hideOverlayUI();
-                    showLoginUI();
-                    android.widget.Toast.makeText(OverlayService.this, "VIP Key Expired!", android.widget.Toast.LENGTH_LONG).show();
-                } else {
-                    // Cek setiap 30 detik
-                    expiryHandler.postDelayed(this, 30000);
-                }
-            }
-        };
-        expiryHandler.post(expiryChecker);
-    }
-
     private void startConnectionChecker() {
+        if (connectionChecker != null) handler.removeCallbacks(connectionChecker);
         connectionChecker = new Runnable() {
             @Override
             public void run() {
                 if (tryConnectToNative()) {
-                    if (!isOverlayShown) {
-                        showOverlayUI();
-                        startConnectionMonitor();
-                    }
+                    // Setiap kali konek, validasi repo dulu
+                    validateRepoAndShow();
                 } else {
-                    // Gagal, coba lagi nanti (tanpa menampilkan apapun)
                     handler.postDelayed(this, RETRY_DELAY_MS);
                 }
             }
         };
         handler.post(connectionChecker);
+    }
+
+    private void validateRepoAndShow() {
+        String key = SecureSession.getSessionKey(this);
+        if (key == null) {
+            forceLogout("Key tidak ditemukan!");
+            return;
+        }
+
+        authManager.validateKey(key, new KeyAuthManager.AuthCallback() {
+            @Override
+            public void onSuccess() {
+                if (!isOverlayShown) showOverlayUI();
+            }
+
+            @Override
+            public void onFailure(String reason) {
+                forceLogout(reason);
+            }
+        });
     }
 
     private boolean tryConnectToNative() {
@@ -151,20 +171,9 @@ public class OverlayService extends Service {
     }
 
     private void showOverlayUI() {
-        // Mencegah menu terbuat 2 kali (Double Window)
-        if (isOverlayShown) return; 
-
-        // Bersihkan view lama yang mungkin tersangkut oleh Virtual Space
-        if (overlayView != null) {
-            try { windowManager.removeView(overlayView); } catch (Exception ignored) {}
-        }
-        if (radarView != null) {
-            try { windowManager.removeView(radarView); } catch (Exception ignored) {}
-        }
+        if (isOverlayShown) return;
 
         isOverlayShown = true;
-        handler.removeCallbacks(connectionChecker);
-
         int type = (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
                 ? WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
                 : WindowManager.LayoutParams.TYPE_PHONE;
@@ -191,8 +200,6 @@ public class OverlayService extends Service {
                 PixelFormat.TRANSLUCENT
         );
         menuParams.gravity = Gravity.TOP | Gravity.START;
-        menuParams.x = 0;
-        menuParams.y = 0;
         overlayView = new OverlayView(this, windowManager, menuParams, radarView);
         windowManager.addView(overlayView, menuParams);
     }
@@ -210,25 +217,7 @@ public class OverlayService extends Service {
             } catch (Exception ignored) {}
             radarView = null;
         }
-        // Mulai reconnect di background
         startConnectionChecker();
-    }
-
-    private void startConnectionMonitor() {
-        monitorThread = new Thread(() -> {
-            while (isOverlayShown) {
-                try {
-                    Thread.sleep(MONITOR_INTERVAL_MS);
-                    if (!tryConnectToNative()) {
-                        handler.post(this::hideOverlayUI);
-                        break;
-                    }
-                } catch (InterruptedException e) {
-                    break;
-                }
-            }
-        });
-        monitorThread.start();
     }
 
     @Override
@@ -245,8 +234,7 @@ public class OverlayService extends Service {
     public void onDestroy() {
         super.onDestroy();
         handler.removeCallbacks(connectionChecker);
-        expiryHandler.removeCallbacks(expiryChecker);
-        if (monitorThread != null) monitorThread.interrupt();
+        securityHandler.removeCallbacks(sessionMonitor);
         hideOverlayUI();
         hideLoginUI();
     }
