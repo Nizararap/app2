@@ -341,7 +341,7 @@ public class OverlayView extends LinearLayout {
                     // MENGGUNAKAN CUSTOM DIALOG MODERN
                     showModernDialog(ctx, "TARGET LOCK HERO", items, selected -> {
                         prefs.edit().putString("locked_hero_name", selected).apply();
-                        if (btnHeroRef[0] != null) btnHeroRef[0].setText("Pilih Hero: [" + selected + "]");
+                        if (btnHeroRef[0] != null) btnHeroRef[0].setText("Select Hero: [" + selected + "]");
                         sendConfigToCpp(prefs);
                     });
                 }
@@ -350,28 +350,30 @@ public class OverlayView extends LinearLayout {
         }));
 
 
-        // ---------- HERO COMBO ----------
-           t.addView(card(ctx, l -> {
+      // ---------- HERO COMBO ----------
+        t.addView(card(ctx, l -> {
             l.addView(secTitle(ctx, "HERO SETTING"));
             
             String currentCombo = prefs.getString("selected_combo", "none");
-            if (currentCombo.isEmpty() || currentCombo.equals("none")) currentCombo = "None";
-            if (currentCombo.equals("gusion")) currentCombo = "Gusion";
-            if (currentCombo.equals("kadita")) currentCombo = "Kadita";
-            if (currentCombo.equals("beatrix")) currentCombo = "Beatrix";
-            if (currentCombo.equals("kimmy")) currentCombo = "Kimmy"; // <-- MAPPING STRING KIMMY
+            String displayCombo = "None";
+            
+            // Gunakan .contains agar embel-embel teks tidak merusak deteksi
+            if (currentCombo.contains("gusion")) displayCombo = "Gusion";
+            else if (currentCombo.contains("kadita")) displayCombo = "Kadita";
+            else if (currentCombo.contains("beatrix")) displayCombo = "Beatrix(ultimate lock)";
+            else if (currentCombo.contains("kimmy")) displayCombo = "Kimmy auto (maybe bug)";
             
             final TextView[] btnComboRef = new TextView[1];
             
-            btnComboRef[0] = (TextView) btn(ctx, "Select Combo: [" + currentCombo + "]", C_BTN_DRK, () -> {
-                // TAMBAHAN KIMMY KE ARRAY LIST MENU
+            btnComboRef[0] = (TextView) btn(ctx, "Select Hero: [" + displayCombo + "]", C_BTN_DRK, () -> {
                 String[] comboList = {"None", "Gusion", "Kadita", "Beatrix(ultimate lock)", "Kimmy auto (maybe bug)"};
                 
-                // MENGGUNAKAN CUSTOM DIALOG MODERN
                 showModernDialog(ctx, "PILIH HERO COMBO", comboList, selected -> {
+                    // Simpan seluruh teks ke huruf kecil
                     String valueToSave = selected.equals("None") ? "none" : selected.toLowerCase();
                     prefs.edit().putString("selected_combo", valueToSave).apply();
-                    if (btnComboRef[0] != null) btnComboRef[0].setText("Pilih Combo:[" + selected + "]");
+                    
+                    if (btnComboRef[0] != null) btnComboRef[0].setText("Select Combo: [" + selected + "]");
                     sendConfigToCpp(prefs);
                 });
             });
@@ -832,11 +834,12 @@ bb.putLong(expirySeconds * 1000); // KIRIM DALAM MILIDETIK
                 int lingAuto   = (lingMode == 2) ? 1 : 0;
                 String selectedCombo = prefs.getString("selected_combo", "none");
                 int activeCombo = 0;
-                if (selectedCombo.equals("gusion")) activeCombo = 1;
-                else if (selectedCombo.equals("kadita")) activeCombo = 2;
-                else if (selectedCombo.equals("beatrix")) activeCombo = 3;
-                else if (selectedCombo.equals("kimmy")) activeCombo = 4; 
-
+                
+                // PERBAIKAN: Gunakan .contains() agar teks modifikasi tidak gagal dideteksi
+                if (selectedCombo.contains("gusion")) activeCombo = 1;
+                else if (selectedCombo.contains("kadita")) activeCombo = 2;
+                else if (selectedCombo.contains("beatrix")) activeCombo = 3;
+                else if (selectedCombo.contains("kimmy")) activeCombo = 4;
 
                 bb.putInt(prefs.getBoolean("aimbot_enable", false) ? 1 : 0);
                 bb.putInt(lingManual);
