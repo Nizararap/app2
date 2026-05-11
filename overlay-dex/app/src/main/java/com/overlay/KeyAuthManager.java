@@ -42,10 +42,11 @@ public class KeyAuthManager {
                 conn.setReadTimeout(10000);
                 conn.setUseCaches(false);
 
-                if (conn.getResponseCode() != 200) {
-                    mainHandler.post(() -> callback.onFailure("Server Error: " + conn.getConnectTimeout()));
-                    return;
-                }
+if (conn.getResponseCode() != 200) {
+    final int timeout = conn.getConnectTimeout(); // efektif final
+    mainHandler.post(() -> callback.onFailure("Server Error: " + timeout));
+    return;
+}
 
                 BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream()));
                 String line;
