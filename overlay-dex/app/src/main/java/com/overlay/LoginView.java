@@ -42,7 +42,8 @@ public class LoginView extends LinearLayout {
     private boolean dragging;
     private boolean isAttached = false;
 
-    // CACHE untuk clipboard (mengatasi pembatasan akses di background)
+    // CACHE clipboard: selalu menyimpan teks terakhir yang disalin di HP
+    // (diperbarui otomatis setiap kali Anda menyalin apapun dari aplikasi manapun)
     private String lastClipboardText = "";
     private ClipboardManager clipboardManager;
 
@@ -53,11 +54,11 @@ public class LoginView extends LinearLayout {
         this.onLoginSuccess = onLoginSuccess;
         this.authManager = new KeyAuthManager(context);
 
-        // Inisialisasi clipboard manager dan pasang listener permanen
+        // Pasang listener: setiap kali clipboard berubah, simpan teks terbaru
         clipboardManager = (ClipboardManager) context.getSystemService(Context.CLIPBOARD_SERVICE);
         if (clipboardManager != null) {
             clipboardManager.addPrimaryClipChangedListener(() -> {
-                if (clipboardManager.hasPrimaryClip()) {
+                try {
                     ClipData clip = clipboardManager.getPrimaryClip();
                     if (clip != null && clip.getItemCount() > 0) {
                         CharSequence text = clip.getItemAt(0).getText();
@@ -65,7 +66,7 @@ public class LoginView extends LinearLayout {
                             lastClipboardText = text.toString().trim();
                         }
                     }
-                }
+                } catch (Exception ignored) {}
             });
         }
 
@@ -159,7 +160,7 @@ public class LoginView extends LinearLayout {
         etKey.setTextSize(14f);
         etKey.setSingleLine(true);
         etKey.setPadding(dp(12), dp(10), dp(12), dp(10));
-        etKey.setFocusable(false); // Hindari blokir keyboard game
+        etKey.setFocusable(false);
         etKey.setClickable(false);
         
         GradientDrawable inputBg = new GradientDrawable();
@@ -202,37 +203,42 @@ public class LoginView extends LinearLayout {
         pLp.setMargins(dp(8), 0, 0, 0);
         btnPaste.setLayoutParams(pLp);
 
-        // FIX: Touch listener sendiri untuk menghindari interferensi drag
+        // Sentuhan khusus agar drag tidak mengganggu klik
         btnPaste.setOnTouchListener((v, event) -> {
             if (event.getAction() == MotionEvent.ACTION_UP) {
                 v.performClick();
             }
             return true;
         });
-        
+
+        // Aksi PASTE: selalu ambil dari cache clipboard terbaru
         btnPaste.setOnClickListener(v -> {
-            // Utamakan teks dari cache (disimpan otomatis saat user menyalin)
+            // Cache selalu diperbarui otomatis setiap kali Anda menyalin di HP
             if (lastClipboardText != null && !lastClipboardText.isEmpty()) {
                 etKey.setText(lastClipboardText);
-                Toast.makeText(ctx, "Pasted!", Toast.LENGTH_SHORT).show();
+                Toast.makeText(ctx, "Pasted: " + lastClipboardText, Toast.LENGTH_SHORT).show();
                 return;
             }
 
-            // Fallback: coba baca langsung (kadang masih bisa)
+            // Fallback: coba baca langsung (jarang berhasil di Android 10+)
             try {
-                ClipboardManager cm = (ClipboardManager) ctx.getSystemService(Context.CLIPBOARD_SERVICE);
-                if (cm != null && cm.hasPrimaryClip()) {
-                    CharSequence text = cm.getPrimaryClip().getItemAt(0).getText();
-                    if (text != null && text.length() > 0) {
-                        etKey.setText(text.toString().trim());
-                        lastClipboardText = text.toString().trim();
-                        Toast.makeText(ctx, "Pasted!", Toast.LENGTH_SHORT).show();
-                        return;
+                if (clipboardManager != null && clipboardManager.hasPrimaryClip()) {
+                    ClipData clip = clipboardManager.getPrimaryClip();
+                    if (clip != null && clip.getItemCount() > 0) {
+                        CharSequence text = clip.getItemAt(0).getText();
+                        if (text != null && text.length() > 0) {
+                            String t = text.toString().trim();
+                            etKey.setText(t);
+                            lastClipboardText = t; // update cache juga
+                            Toast.makeText(ctx, "Pasted!", Toast.LENGTH_SHORT).show();
+                            return;
+                        }
                     }
                 }
             } catch (Exception ignored) {}
 
-            Toast.makeText(ctx, "Clipboard kosong. Salin key dulu!", Toast.LENGTH_SHORT).show();
+            // Jika sampai sini, berarti belum ada teks di clipboard
+            Toast.makeText(ctx, "Clipboard kosong. Silakan salin key dari Telegram/WA dulu.", Toast.LENGTH_LONG).show();
         });
         inputArea.addView(btnPaste);
         
