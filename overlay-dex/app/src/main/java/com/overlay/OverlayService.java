@@ -29,7 +29,6 @@ public class OverlayService extends Service {
     private boolean isOverlayShown = false;
     private boolean isLoginShown = false;
     
-    private static final long SESSION_LIMIT = 5 * 60 * 60 * 1000; // 5 Jam
     private static final int RETRY_DELAY_MS = 2000;
 
     @Override
@@ -52,7 +51,8 @@ public class OverlayService extends Service {
     }
 
     private void checkInitialSession() {
-        if (isSessionValid()) {
+        // 🔄 Ganti: gunakan authManager.isKeyValid() langsung
+        if (authManager.isKeyValid()) {
             startConnectionChecker();
             startSessionMonitor();
         } else {
@@ -60,19 +60,13 @@ public class OverlayService extends Service {
         }
     }
 
-    private boolean isSessionValid() {
-        if (!SecureSession.isSessionFileExists(this)) return false;
-        long timestamp = SecureSession.getSessionTimestamp(this);
-        return (System.currentTimeMillis() - timestamp) < SESSION_LIMIT;
-    }
-
     private void startSessionMonitor() {
         if (sessionMonitor != null) securityHandler.removeCallbacks(sessionMonitor);
         sessionMonitor = new Runnable() {
             @Override
             public void run() {
-                if (!isSessionValid()) {
-                    forceLogout("Sesi berakhir atau file keamanan dihapus!");
+                if (!authManager.isKeyValid()) {
+                    forceLogout("VIP Key Expired! Please login again.");
                 } else {
                     securityHandler.postDelayed(this, 30000); // Cek tiap 30 detik
                 }
@@ -129,34 +123,16 @@ public class OverlayService extends Service {
             @Override
             public void run() {
                 if (tryConnectToNative()) {
-                    // Setiap kali konek, validasi repo dulu
-                    validateRepoAndShow();
+                    // Langsung tampilkan overlay tanpa validasi ulang key (karena sudah dicek di checkInitialSession)
+                    if (!isOverlayShown) {
+                        showOverlayUI();
+                    }
                 } else {
                     handler.postDelayed(this, RETRY_DELAY_MS);
                 }
             }
         };
         handler.post(connectionChecker);
-    }
-
-    private void validateRepoAndShow() {
-        String key = SecureSession.getSessionKey(this);
-        if (key == null) {
-            forceLogout("Key tidak ditemukan!");
-            return;
-        }
-
-        authManager.validateKey(key, new KeyAuthManager.AuthCallback() {
-            @Override
-            public void onSuccess() {
-                if (!isOverlayShown) showOverlayUI();
-            }
-
-            @Override
-            public void onFailure(String reason) {
-                forceLogout(reason);
-            }
-        });
     }
 
     private boolean tryConnectToNative() {

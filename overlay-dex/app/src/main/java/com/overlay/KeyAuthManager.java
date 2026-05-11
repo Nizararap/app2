@@ -9,13 +9,15 @@ import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.security.MessageDigest;
-import java.nio.charset.StandardCharsets;
 
 public class KeyAuthManager {
     private static final String PREF_NAME = "vip_auth_prefs";
+    private static final String KEY_SAVED_KEY = "saved_vip_key";
+    private static final String KEY_EXPIRY = "key_expiry_time";
+
     private static final String KEY_DB_URL = "https://raw.githubusercontent.com/Nizararap/Internal-keys/refs/heads/main/keys.txt";
-    
-    private final Context context;
+
+    private final SharedPreferences prefs;
     private final SharedPreferences modPrefs;
     private final Handler mainHandler;
 
@@ -25,9 +27,24 @@ public class KeyAuthManager {
     }
 
     public KeyAuthManager(Context context) {
-        this.context = context;
+        this.prefs = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE);
         this.modPrefs = context.getSharedPreferences("mod_settings", Context.MODE_PRIVATE);
         this.mainHandler = new Handler(Looper.getMainLooper());
+    }
+
+    public boolean isKeyValid() {
+        long expiry = prefs.getLong(KEY_EXPIRY, 0);
+        return System.currentTimeMillis() / 1000 < expiry;
+    }
+
+    public long getRemainingTime() {
+        long expiry = prefs.getLong(KEY_EXPIRY, 0);
+        return Math.max(0, expiry - (System.currentTimeMillis() / 1000));
+    }
+
+    /** Ambil timestamp expiry (detik) untuk dikirim ke native */
+    public long getExpiryTimestamp() {
+        return prefs.getLong(KEY_EXPIRY, 0);
     }
 
     public void validateKey(final String userKey, final AuthCallback callback) {
@@ -38,20 +55,26 @@ public class KeyAuthManager {
                 URL url = new URL(KEY_DB_URL);
                 conn = (HttpURLConnection) url.openConnection();
                 conn.setRequestMethod("GET");
-                conn.setConnectTimeout(10000);
-                conn.setReadTimeout(10000);
+                conn.setConnectTimeout(15000);
+                conn.setReadTimeout(15000);
+                conn.setRequestProperty("User-Agent", "Mozilla/5.0");
                 conn.setUseCaches(false);
 
-                if (conn.getResponseCode() != 200) {
-                    mainHandler.post(() -> callback.onFailure("Server Error: " + conn.getConnectTimeout()));
+                int responseCode = conn.getResponseCode();
+                if (responseCode != 200) {
+                    final int code = responseCode;
+                    mainHandler.post(() -> callback.onFailure("Server error: " + code));
                     return;
                 }
 
                 BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream()));
                 String line;
                 boolean found = false;
+                long expiry = 0;
                 while ((line = reader.readLine()) != null) {
-                    if (line.trim().equals(hashedKey)) {
+                    String[] parts = line.trim().split(":");
+                    if (parts.length == 2 && parts[0].equals(hashedKey)) {
+                        expiry = Long.parseLong(parts[1]);
                         found = true;
                         break;
                     }
@@ -59,14 +82,22 @@ public class KeyAuthManager {
                 reader.close();
 
                 if (found) {
-                    // Simpan ke file terenkripsi
-                    SecureSession.saveSession(context, userKey, System.currentTimeMillis());
-                    mainHandler.post(callback::onSuccess);
+                    long now = System.currentTimeMillis() / 1000;
+                    if (now < expiry) {
+                        prefs.edit()
+                            .putString(KEY_SAVED_KEY, userKey)
+                            .putLong(KEY_EXPIRY, expiry)
+                            .apply();
+                        mainHandler.post(callback::onSuccess);
+                    } else {
+                        mainHandler.post(() -> callback.onFailure("Key sudah expired!"));
+                    }
                 } else {
-                    mainHandler.post(() -> callback.onFailure("Key tidak valid atau sudah expired!"));
+                    mainHandler.post(() -> callback.onFailure("Key tidak valid!"));
                 }
             } catch (Exception e) {
-                mainHandler.post(() -> callback.onFailure("Koneksi gagal: " + e.getMessage()));
+                final String msg = e.getMessage();
+                mainHandler.post(() -> callback.onFailure("Koneksi gagal: " + msg));
             } finally {
                 if (conn != null) conn.disconnect();
             }
@@ -74,14 +105,17 @@ public class KeyAuthManager {
     }
 
     public void logout() {
-        SecureSession.clearSession(context);
-        modPrefs.edit().clear().apply();
+        prefs.edit().clear().apply();
+        SharedPreferences.Editor editor = modPrefs.edit();
+        editor.putBoolean("radar_enable", false);
+        editor.putBoolean("aimbot_enable", false);
+        editor.apply();
     }
 
     private String sha256(String base) {
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] hash = digest.digest(base.getBytes(StandardCharsets.UTF_8));
+            byte[] hash = digest.digest(base.getBytes("UTF-8"));
             StringBuilder hexString = new StringBuilder();
             for (byte b : hash) {
                 String hex = Integer.toHexString(0xff & b);
@@ -90,7 +124,7 @@ public class KeyAuthManager {
             }
             return hexString.toString();
         } catch (Exception ex) {
-            return "";
+            throw new RuntimeException(ex);
         }
     }
 }
