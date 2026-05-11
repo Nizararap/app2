@@ -52,8 +52,16 @@ public class KeyAuthManager {
                 URL url = new URL(KEY_DB_URL);
                 HttpURLConnection conn = (HttpURLConnection) url.openConnection();
                 conn.setRequestMethod("GET");
-                conn.setConnectTimeout(10000);
-                conn.setReadTimeout(10000);
+                conn.setConnectTimeout(15000);
+                conn.setReadTimeout(15000);
+                conn.setRequestProperty("User-Agent", "Mozilla/5.0"); // Menghindari block dari server
+                conn.setUseCaches(false);
+
+                int responseCode = conn.getResponseCode();
+                if (responseCode != 200) {
+                    mainHandler.post(() -> callback.onFailure("Server error: " + responseCode));
+                    return;
+                }
 
                 BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream()));
                 StringBuilder sb = new StringBuilder();

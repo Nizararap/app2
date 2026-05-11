@@ -8,6 +8,8 @@ import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.text.InputType;
 import android.view.Gravity;
+import android.view.MotionEvent;
+import android.view.View;
 import android.view.WindowManager;
 import android.widget.EditText;
 import android.widget.LinearLayout;
@@ -27,9 +29,15 @@ public class LoginView extends LinearLayout {
     private final KeyAuthManager authManager;
     private final Runnable onLoginSuccess;
 
+    private LinearLayout loginCard;
+    private TextView tvPill;
     private EditText etKey;
     private TextView btnLogin;
     private ProgressBar loader;
+
+    private float tx, ty;
+    private int ix, iy;
+    private boolean dragging;
 
     public LoginView(Context context, WindowManager wm, WindowManager.LayoutParams lp, Runnable onLoginSuccess) {
         super(context);
@@ -39,123 +47,138 @@ public class LoginView extends LinearLayout {
         this.authManager = new KeyAuthManager(context);
 
         setOrientation(VERTICAL);
-        setGravity(Gravity.CENTER);
         
-        // Background Dim
-        setBackgroundColor(Color.argb(180, 0, 0, 0));
-
+        buildPill(context);
         buildUI(context);
+        
+        showExpanded();
+    }
+
+    private void buildPill(Context ctx) {
+        tvPill = new TextView(ctx);
+        tvPill.setText("🔑 VIP");
+        tvPill.setTextColor(C_ACCENT);
+        tvPill.setTextSize(14f);
+        tvPill.setTypeface(null, Typeface.BOLD);
+        tvPill.setGravity(Gravity.CENTER);
+        tvPill.setPadding(dp(15), dp(10), dp(15), dp(10));
+        
+        GradientDrawable bg = new GradientDrawable();
+        bg.setColor(C_BG);
+        bg.setCornerRadius(dp(50));
+        bg.setStroke(dp(1), Color.argb(100, 0, 212, 255));
+        tvPill.setBackground(bg);
+        
+        tvPill.setOnTouchListener(dragL);
+        addView(tvPill);
     }
 
     private void buildUI(Context ctx) {
-        LinearLayout card = new LinearLayout(ctx);
-        card.setOrientation(VERTICAL);
-        card.setPadding(dp(25), dp(30), dp(25), dp(30));
-        card.setGravity(Gravity.CENTER_HORIZONTAL);
+        loginCard = new LinearLayout(ctx);
+        loginCard.setOrientation(VERTICAL);
+        loginCard.setPadding(dp(20), dp(20), dp(20), dp(20));
+        loginCard.setGravity(Gravity.CENTER_HORIZONTAL);
         
         GradientDrawable gd = new GradientDrawable();
         gd.setColor(C_BG);
-        gd.setCornerRadius(dp(20));
+        gd.setCornerRadius(dp(15));
         gd.setStroke(dp(1), Color.argb(100, 0, 212, 255));
-        card.setBackground(gd);
+        loginCard.setBackground(gd);
 
-        LayoutParams cardLp = new LayoutParams(dp(300), LayoutParams.WRAP_CONTENT);
-        card.setLayoutParams(cardLp);
+        LayoutParams cardLp = new LayoutParams(dp(280), LayoutParams.WRAP_CONTENT);
+        loginCard.setLayoutParams(cardLp);
 
-        // Title
+        // Header with Minimize
+        LinearLayout header = new LinearLayout(ctx);
+        header.setOrientation(HORIZONTAL);
+        header.setGravity(Gravity.CENTER_VERTICAL);
+        header.setPadding(0, 0, 0, dp(15));
+        
         TextView title = new TextView(ctx);
         title.setText("VIP LOGIN");
         title.setTextColor(C_ACCENT);
-        title.setTextSize(22f);
+        title.setTextSize(18f);
         title.setTypeface(null, Typeface.BOLD);
-        card.addView(title);
-
-        TextView sub = new TextView(ctx);
-        sub.setText("Enter your key to access features");
-        sub.setTextColor(C_SUBTEXT);
-        sub.setTextSize(12f);
-        sub.setPadding(0, 0, 0, dp(25));
-        card.addView(sub);
+        title.setLayoutParams(new LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f));
+        header.addView(title);
+        
+        TextView minBtn = new TextView(ctx);
+        minBtn.setText("─");
+        minBtn.setTextColor(C_SUBTEXT);
+        minBtn.setPadding(dp(10), dp(5), dp(10), dp(5));
+        minBtn.setOnClickListener(v -> showCollapsed());
+        header.addView(minBtn);
+        
+        loginCard.addView(header);
 
         // Input Key
         etKey = new EditText(ctx);
-        etKey.setHint("TZY-XXXXXXXX");
+        etKey.setHint("Enter VIP Key");
         etKey.setHintTextColor(Color.GRAY);
         etKey.setTextColor(Color.WHITE);
         etKey.setInputType(InputType.TYPE_CLASS_TEXT);
         etKey.setSingleLine(true);
-        etKey.setPadding(dp(15), dp(12), dp(15), dp(12));
+        etKey.setPadding(dp(12), dp(10), dp(12), dp(10));
         
         GradientDrawable inputBg = new GradientDrawable();
         inputBg.setColor(C_CARD);
-        inputBg.setCornerRadius(dp(10));
+        inputBg.setCornerRadius(dp(8));
         inputBg.setStroke(dp(1), Color.parseColor("#1E1E28"));
         etKey.setBackground(inputBg);
         
         LayoutParams etLp = new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
-        etLp.setMargins(0, 0, 0, dp(20));
+        etLp.setMargins(0, 0, 0, dp(15));
         etKey.setLayoutParams(etLp);
-        card.addView(etKey);
+        loginCard.addView(etKey);
 
         // Loader
         loader = new ProgressBar(ctx, null, android.R.attr.progressBarStyleSmall);
         loader.setVisibility(GONE);
-        card.addView(loader);
+        loginCard.addView(loader);
 
         // Button Login
         btnLogin = new TextView(ctx);
-        btnLogin.setText("LOGIN NOW");
+        btnLogin.setText("LOGIN");
         btnLogin.setTextColor(Color.BLACK);
         btnLogin.setTypeface(null, Typeface.BOLD);
         btnLogin.setGravity(Gravity.CENTER);
-        btnLogin.setPadding(0, dp(12), 0, dp(12));
+        btnLogin.setPadding(0, dp(10), 0, dp(10));
         
         GradientDrawable btnBg = new GradientDrawable();
         btnBg.setColor(C_ACCENT);
-        btnBg.setCornerRadius(dp(10));
+        btnBg.setCornerRadius(dp(8));
         btnLogin.setBackground(btnBg);
         
         btnLogin.setOnClickListener(v -> attemptLogin());
-        card.addView(btnLogin);
+        loginCard.addView(btnLogin);
 
-        // Get Key & Telegram
+        // Footer
         LinearLayout footer = new LinearLayout(ctx);
-        footer.setOrientation(HORIZONTAL);
         footer.setGravity(Gravity.CENTER);
-        footer.setPadding(0, dp(20), 0, 0);
+        footer.setPadding(0, dp(15), 0, 0);
 
         TextView tvGet = new TextView(ctx);
         tvGet.setText("Get Key");
         tvGet.setTextColor(C_ACCENT);
+        tvGet.setTextSize(12f);
         tvGet.setPadding(dp(10), dp(5), dp(10), dp(5));
         tvGet.setOnClickListener(v -> {
             Intent i = new Intent(Intent.ACTION_VIEW, Uri.parse("https://t.me/modfreew"));
             i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             ctx.startActivity(i);
         });
-        
-        TextView tvTele = new TextView(ctx);
-        tvTele.setText("Telegram");
-        tvTele.setTextColor(C_ACCENT);
-        tvTele.setPadding(dp(10), dp(5), dp(10), dp(5));
-        tvTele.setOnClickListener(v -> {
-            Intent i = new Intent(Intent.ACTION_VIEW, Uri.parse("https://t.me/modfreew"));
-            i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            ctx.startActivity(i);
-        });
-
         footer.addView(tvGet);
-        footer.addView(new TextView(ctx) {{ setText("|"); setTextColor(C_SUBTEXT); }});
-        footer.addView(tvTele);
-        card.addView(footer);
-
-        addView(card);
+        
+        loginCard.addView(footer);
+        
+        loginCard.setOnTouchListener(dragL);
+        addView(loginCard);
     }
 
     private void attemptLogin() {
         String key = etKey.getText().toString().trim();
         if (key.isEmpty()) {
-            Toast.makeText(getContext(), "Key tidak boleh kosong!", Toast.LENGTH_SHORT).show();
+            Toast.makeText(getContext(), "Key required!", Toast.LENGTH_SHORT).show();
             return;
         }
 
@@ -164,14 +187,14 @@ public class LoginView extends LinearLayout {
             @Override
             public void onSuccess() {
                 setLoading(false);
-                Toast.makeText(getContext(), "Login Berhasil!", Toast.LENGTH_SHORT).show();
+                Toast.makeText(getContext(), "Success!", Toast.LENGTH_SHORT).show();
                 onLoginSuccess.run();
             }
 
             @Override
             public void onFailure(String reason) {
                 setLoading(false);
-                Toast.makeText(getContext(), "Gagal: " + reason, Toast.LENGTH_SHORT).show();
+                Toast.makeText(getContext(), reason, Toast.LENGTH_SHORT).show();
             }
         });
     }
@@ -182,7 +205,51 @@ public class LoginView extends LinearLayout {
         etKey.setEnabled(!loading);
     }
 
+    private void showCollapsed() {
+        loginCard.setVisibility(GONE);
+        tvPill.setVisibility(VISIBLE);
+        lp.width = WindowManager.LayoutParams.WRAP_CONTENT;
+        lp.height = WindowManager.LayoutParams.WRAP_CONTENT;
+        wm.updateViewLayout(this, lp);
+    }
+
+    private void showExpanded() {
+        tvPill.setVisibility(GONE);
+        loginCard.setVisibility(VISIBLE);
+        lp.width = WindowManager.LayoutParams.WRAP_CONTENT;
+        lp.height = WindowManager.LayoutParams.WRAP_CONTENT;
+        wm.updateViewLayout(this, lp);
+    }
+
     private int dp(int v) {
         return (int) (v * getContext().getResources().getDisplayMetrics().density);
     }
+
+    private final OnTouchListener dragL = new OnTouchListener() {
+        @Override
+        public boolean onTouch(View v, MotionEvent e) {
+            switch (e.getAction()) {
+                case MotionEvent.ACTION_DOWN:
+                    tx = e.getRawX(); ty = e.getRawY();
+                    ix = lp.x; iy = lp.y;
+                    dragging = false;
+                    return true;
+                case MotionEvent.ACTION_MOVE:
+                    int dx = (int)(e.getRawX() - tx);
+                    int dy = (int)(e.getRawY() - ty);
+                    if (Math.abs(dx) > 10 || Math.abs(dy) > 10) {
+                        dragging = true;
+                        lp.x = ix + dx;
+                        lp.y = iy + dy;
+                        wm.updateViewLayout(LoginView.this, lp);
+                    }
+                    return true;
+                case MotionEvent.ACTION_UP:
+                    if (!dragging && v == tvPill) showExpanded();
+                    else if (!dragging) v.performClick();
+                    return true;
+            }
+            return false;
+        }
+    };
 }
