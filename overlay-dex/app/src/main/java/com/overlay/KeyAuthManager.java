@@ -47,19 +47,21 @@ public class KeyAuthManager {
 
     public void validateKey(final String userKey, final AuthCallback callback) {
         new Thread(() -> {
+            HttpURLConnection conn = null;
             try {
                 String hashedKey = sha256(userKey);
                 URL url = new URL(KEY_DB_URL);
-                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+                conn = (HttpURLConnection) url.openConnection();
                 conn.setRequestMethod("GET");
                 conn.setConnectTimeout(15000);
                 conn.setReadTimeout(15000);
-                conn.setRequestProperty("User-Agent", "Mozilla/5.0"); // Menghindari block dari server
+                conn.setRequestProperty("User-Agent", "Mozilla/5.0");
                 conn.setUseCaches(false);
 
                 int responseCode = conn.getResponseCode();
                 if (responseCode != 200) {
-                    mainHandler.post(() -> callback.onFailure("Server error: " + responseCode));
+                    final int code = responseCode;
+                    mainHandler.post(() -> callback.onFailure("Server error: " + code));
                     return;
                 }
 
@@ -90,7 +92,10 @@ public class KeyAuthManager {
                     mainHandler.post(() -> callback.onFailure("Key tidak valid!"));
                 }
             } catch (Exception e) {
-                mainHandler.post(() -> callback.onFailure("Kesalahan koneksi: " + e.getMessage()));
+                final String msg = e.getMessage();
+                mainHandler.post(() -> callback.onFailure("Koneksi gagal: " + msg));
+            } finally {
+                if (conn != null) conn.disconnect();
             }
         }).start();
     }

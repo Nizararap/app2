@@ -61,8 +61,7 @@ public class OverlayService extends Service {
 
     private void showLoginUI() {
         if (isLoginShown) return;
-        isLoginShown = true;
-
+        
         int type = (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
                 ? WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
                 : WindowManager.LayoutParams.TYPE_PHONE;
@@ -75,13 +74,20 @@ public class OverlayService extends Service {
                 PixelFormat.TRANSLUCENT
         );
         loginParams.gravity = Gravity.CENTER;
+        loginParams.x = 0;
+        loginParams.y = 0;
 
         loginView = new LoginView(this, windowManager, loginParams, () -> {
             hideLoginUI();
             checkAuthAndStart();
         });
 
-        windowManager.addView(loginView, loginParams);
+        try {
+            windowManager.addView(loginView, loginParams);
+            isLoginShown = true;
+        } catch (Exception e) {
+            isLoginShown = false;
+        }
     }
 
     private void hideLoginUI() {

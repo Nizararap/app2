@@ -38,6 +38,7 @@ public class LoginView extends LinearLayout {
     private float tx, ty;
     private int ix, iy;
     private boolean dragging;
+    private boolean isAttached = false;
 
     public LoginView(Context context, WindowManager wm, WindowManager.LayoutParams lp, Runnable onLoginSuccess) {
         super(context);
@@ -51,7 +52,21 @@ public class LoginView extends LinearLayout {
         buildPill(context);
         buildUI(context);
         
-        showExpanded();
+        // Sembunyikan pill dulu, tampilkan card
+        tvPill.setVisibility(GONE);
+        loginCard.setVisibility(VISIBLE);
+    }
+
+    @Override
+    protected void onAttachedToWindow() {
+        super.onAttachedToWindow();
+        isAttached = true;
+    }
+
+    @Override
+    protected void onDetachedFromWindow() {
+        super.onDetachedFromWindow();
+        isAttached = false;
     }
 
     private void buildPill(Context ctx) {
@@ -206,19 +221,21 @@ public class LoginView extends LinearLayout {
     }
 
     private void showCollapsed() {
+        if (!isAttached) return;
         loginCard.setVisibility(GONE);
         tvPill.setVisibility(VISIBLE);
         lp.width = WindowManager.LayoutParams.WRAP_CONTENT;
         lp.height = WindowManager.LayoutParams.WRAP_CONTENT;
-        wm.updateViewLayout(this, lp);
+        try { wm.updateViewLayout(this, lp); } catch (Exception ignored) {}
     }
 
     private void showExpanded() {
+        if (!isAttached) return;
         tvPill.setVisibility(GONE);
         loginCard.setVisibility(VISIBLE);
         lp.width = WindowManager.LayoutParams.WRAP_CONTENT;
         lp.height = WindowManager.LayoutParams.WRAP_CONTENT;
-        wm.updateViewLayout(this, lp);
+        try { wm.updateViewLayout(this, lp); } catch (Exception ignored) {}
     }
 
     private int dp(int v) {
@@ -228,6 +245,7 @@ public class LoginView extends LinearLayout {
     private final OnTouchListener dragL = new OnTouchListener() {
         @Override
         public boolean onTouch(View v, MotionEvent e) {
+            if (!isAttached) return false;
             switch (e.getAction()) {
                 case MotionEvent.ACTION_DOWN:
                     tx = e.getRawX(); ty = e.getRawY();
@@ -241,7 +259,7 @@ public class LoginView extends LinearLayout {
                         dragging = true;
                         lp.x = ix + dx;
                         lp.y = iy + dy;
-                        wm.updateViewLayout(LoginView.this, lp);
+                        try { wm.updateViewLayout(LoginView.this, lp); } catch (Exception ignored) {}
                     }
                     return true;
                 case MotionEvent.ACTION_UP:
