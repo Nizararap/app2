@@ -1,5 +1,6 @@
 package com.overlay;
 
+import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.Color;
@@ -52,7 +53,6 @@ public class LoginView extends LinearLayout {
         buildPill(context);
         buildUI(context);
         
-        // Sembunyikan pill dulu, tampilkan card
         tvPill.setVisibility(GONE);
         loginCard.setVisibility(VISIBLE);
     }
@@ -103,7 +103,7 @@ public class LoginView extends LinearLayout {
         LayoutParams cardLp = new LayoutParams(dp(280), LayoutParams.WRAP_CONTENT);
         loginCard.setLayoutParams(cardLp);
 
-        // Header with Minimize
+        // Header
         LinearLayout header = new LinearLayout(ctx);
         header.setOrientation(HORIZONTAL);
         header.setGravity(Gravity.CENTER_VERTICAL);
@@ -123,17 +123,23 @@ public class LoginView extends LinearLayout {
         minBtn.setPadding(dp(10), dp(5), dp(10), dp(5));
         minBtn.setOnClickListener(v -> showCollapsed());
         header.addView(minBtn);
-        
         loginCard.addView(header);
 
-        // Input Key
+        // Input Area with Paste Button
+        LinearLayout inputArea = new LinearLayout(ctx);
+        inputArea.setOrientation(HORIZONTAL);
+        inputArea.setGravity(Gravity.CENTER_VERTICAL);
+        inputArea.setPadding(0, 0, 0, dp(15));
+        
         etKey = new EditText(ctx);
-        etKey.setHint("Enter VIP Key");
+        etKey.setHint("VIP Key...");
         etKey.setHintTextColor(Color.GRAY);
         etKey.setTextColor(Color.WHITE);
-        etKey.setInputType(InputType.TYPE_CLASS_TEXT);
+        etKey.setTextSize(14f);
         etKey.setSingleLine(true);
         etKey.setPadding(dp(12), dp(10), dp(12), dp(10));
+        etKey.setFocusable(false); // Hindari blokir keyboard game
+        etKey.setClickable(false);
         
         GradientDrawable inputBg = new GradientDrawable();
         inputBg.setColor(C_CARD);
@@ -141,10 +147,47 @@ public class LoginView extends LinearLayout {
         inputBg.setStroke(dp(1), Color.parseColor("#1E1E28"));
         etKey.setBackground(inputBg);
         
-        LayoutParams etLp = new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
-        etLp.setMargins(0, 0, 0, dp(15));
+        LayoutParams etLp = new LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f);
         etKey.setLayoutParams(etLp);
-        loginCard.addView(etKey);
+        inputArea.addView(etKey);
+
+        // Paste Button
+        TextView btnPaste = new TextView(ctx);
+        btnPaste.setText("PASTE");
+        btnPaste.setTextColor(Color.BLACK);
+        btnPaste.setTextSize(11f);
+        btnPaste.setTypeface(null, Typeface.BOLD);
+        btnPaste.setGravity(Gravity.CENTER);
+        btnPaste.setPadding(dp(10), dp(8), dp(10), dp(8));
+        
+        GradientDrawable pBg = new GradientDrawable();
+        pBg.setColor(C_ACCENT);
+        pBg.setCornerRadius(dp(5));
+        btnPaste.setBackground(pBg);
+        
+        LayoutParams pLp = new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
+        pLp.setMargins(dp(8), 0, 0, 0);
+        btnPaste.setLayoutParams(pLp);
+        
+        btnPaste.setOnClickListener(v -> {
+            try {
+                ClipboardManager clipboard = (ClipboardManager) ctx.getSystemService(Context.CLIPBOARD_SERVICE);
+                if (clipboard != null && clipboard.hasPrimaryClip()) {
+                    CharSequence text = clipboard.getPrimaryClip().getItemAt(0).getText();
+                    if (text != null) {
+                        etKey.setText(text.toString().trim());
+                        Toast.makeText(ctx, "Pasted!", Toast.LENGTH_SHORT).show();
+                    }
+                } else {
+                    Toast.makeText(ctx, "Clipboard empty!", Toast.LENGTH_SHORT).show();
+                }
+            } catch (Exception e) {
+                Toast.makeText(ctx, "Paste failed!", Toast.LENGTH_SHORT).show();
+            }
+        });
+        inputArea.addView(btnPaste);
+        
+        loginCard.addView(inputArea);
 
         // Loader
         loader = new ProgressBar(ctx, null, android.R.attr.progressBarStyleSmall);
@@ -157,7 +200,7 @@ public class LoginView extends LinearLayout {
         btnLogin.setTextColor(Color.BLACK);
         btnLogin.setTypeface(null, Typeface.BOLD);
         btnLogin.setGravity(Gravity.CENTER);
-        btnLogin.setPadding(0, dp(10), 0, dp(10));
+        btnLogin.setPadding(0, dp(12), 0, dp(12));
         
         GradientDrawable btnBg = new GradientDrawable();
         btnBg.setColor(C_ACCENT);
@@ -217,7 +260,6 @@ public class LoginView extends LinearLayout {
     private void setLoading(boolean loading) {
         btnLogin.setVisibility(loading ? GONE : VISIBLE);
         loader.setVisibility(loading ? VISIBLE : GONE);
-        etKey.setEnabled(!loading);
     }
 
     private void showCollapsed() {
