@@ -8,6 +8,8 @@ import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
+import android.os.Handler;
+import android.os.Looper;
 import android.text.InputType;
 import android.view.Gravity;
 import android.view.MotionEvent;
@@ -42,10 +44,7 @@ public class LoginView extends LinearLayout {
     private boolean dragging;
     private boolean isAttached = false;
 
-    // CACHE clipboard: selalu menyimpan teks terakhir yang disalin di HP
-    // (diperbarui otomatis setiap kali Anda menyalin apapun dari aplikasi manapun)
-    private String lastClipboardText = "";
-    private ClipboardManager clipboardManager;
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
 
     public LoginView(Context context, WindowManager wm, WindowManager.LayoutParams lp, Runnable onLoginSuccess) {
         super(context);
@@ -53,22 +52,6 @@ public class LoginView extends LinearLayout {
         this.lp = lp;
         this.onLoginSuccess = onLoginSuccess;
         this.authManager = new KeyAuthManager(context);
-
-        // Pasang listener: setiap kali clipboard berubah, simpan teks terbaru
-        clipboardManager = (ClipboardManager) context.getSystemService(Context.CLIPBOARD_SERVICE);
-        if (clipboardManager != null) {
-            clipboardManager.addPrimaryClipChangedListener(() -> {
-                try {
-                    ClipData clip = clipboardManager.getPrimaryClip();
-                    if (clip != null && clip.getItemCount() > 0) {
-                        CharSequence text = clip.getItemAt(0).getText();
-                        if (text != null) {
-                            lastClipboardText = text.toString().trim();
-                        }
-                    }
-                } catch (Exception ignored) {}
-            });
-        }
 
         setOrientation(VERTICAL);
         
@@ -147,7 +130,7 @@ public class LoginView extends LinearLayout {
         header.addView(minBtn);
         loginCard.addView(header);
 
-        // Input Area with Paste & Clear Buttons
+        // Input Area
         LinearLayout inputArea = new LinearLayout(ctx);
         inputArea.setOrientation(HORIZONTAL);
         inputArea.setGravity(Gravity.CENTER_VERTICAL);
@@ -160,8 +143,9 @@ public class LoginView extends LinearLayout {
         etKey.setTextSize(14f);
         etKey.setSingleLine(true);
         etKey.setPadding(dp(12), dp(10), dp(12), dp(10));
-        etKey.setFocusable(false);
-        etKey.setClickable(false);
+        // Jangan set focusable false, kita butuh fokus sementara saat paste
+        etKey.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
+        // Biarkan tidak fokus di awal, tapi bisa diminta fokus nanti
         
         GradientDrawable inputBg = new GradientDrawable();
         inputBg.setColor(C_CARD);
@@ -203,7 +187,7 @@ public class LoginView extends LinearLayout {
         pLp.setMargins(dp(8), 0, 0, 0);
         btnPaste.setLayoutParams(pLp);
 
-        // Sentuhan khusus agar drag tidak mengganggu klik
+        // Sentuhan khusus agar drag tidak mengganggu
         btnPaste.setOnTouchListener((v, event) -> {
             if (event.getAction() == MotionEvent.ACTION_UP) {
                 v.performClick();
@@ -211,37 +195,10 @@ public class LoginView extends LinearLayout {
             return true;
         });
 
-        // Aksi PASTE: selalu ambil dari cache clipboard terbaru
-        btnPaste.setOnClickListener(v -> {
-            // Cache selalu diperbarui otomatis setiap kali Anda menyalin di HP
-            if (lastClipboardText != null && !lastClipboardText.isEmpty()) {
-                etKey.setText(lastClipboardText);
-                Toast.makeText(ctx, "Pasted: " + lastClipboardText, Toast.LENGTH_SHORT).show();
-                return;
-            }
+        // Aksi PASTE: minta fokus sementara agar bisa membaca clipboard
+        btnPaste.setOnClickListener(v -> doPasteWithFocus(ctx));
 
-            // Fallback: coba baca langsung (jarang berhasil di Android 10+)
-            try {
-                if (clipboardManager != null && clipboardManager.hasPrimaryClip()) {
-                    ClipData clip = clipboardManager.getPrimaryClip();
-                    if (clip != null && clip.getItemCount() > 0) {
-                        CharSequence text = clip.getItemAt(0).getText();
-                        if (text != null && text.length() > 0) {
-                            String t = text.toString().trim();
-                            etKey.setText(t);
-                            lastClipboardText = t; // update cache juga
-                            Toast.makeText(ctx, "Pasted!", Toast.LENGTH_SHORT).show();
-                            return;
-                        }
-                    }
-                }
-            } catch (Exception ignored) {}
-
-            // Jika sampai sini, berarti belum ada teks di clipboard
-            Toast.makeText(ctx, "Clipboard kosong. Silakan salin key dari Telegram/WA dulu.", Toast.LENGTH_LONG).show();
-        });
         inputArea.addView(btnPaste);
-        
         loginCard.addView(inputArea);
 
         // Loader
@@ -286,6 +243,58 @@ public class LoginView extends LinearLayout {
         
         loginCard.setOnTouchListener(dragL);
         addView(loginCard);
+    }
+
+    /**
+     * Ambil alih fokus sementara, baca clipboard, tempel, lalu kembalikan fokus.
+     */
+    private void doPasteWithFocus(Context ctx) {
+        // 1. Simpan flag awal & hapus FLAG_NOT_FOCUSABLE
+        final int originalFlags = lp.flags;
+        lp.flags &= ~WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE;
+        // Opsional: tambahkan FLAG_ALT_FOCUSABLE_IM agar keyboard tidak muncul
+        // lp.flags |= WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM; // Tidak perlu karena kita tidak ingin keyboard
+        try {
+            wm.updateViewLayout(this, lp);
+        } catch (Exception ignored) {}
+
+        // 2. Fokus ke EditText (tanpa keyboard, karena FLAG_ALT_FOCUSABLE_IM tidak kita tambahkan)
+        etKey.setFocusableInTouchMode(true);
+        etKey.requestFocus();
+
+        // 3. Tunda sebentar agar sistem memproses fokus
+        mainHandler.postDelayed(() -> {
+            try {
+                ClipboardManager cm = (ClipboardManager) ctx.getSystemService(Context.CLIPBOARD_SERVICE);
+                if (cm != null && cm.hasPrimaryClip()) {
+                    ClipData clip = cm.getPrimaryClip();
+                    if (clip != null && clip.getItemCount() > 0) {
+                        CharSequence text = clip.getItemAt(0).getText();
+                        if (text != null) {
+                            etKey.setText(text.toString().trim());
+                            Toast.makeText(ctx, "Pasted!", Toast.LENGTH_SHORT).show();
+                        } else {
+                            Toast.makeText(ctx, "Clipboard berisi teks kosong", Toast.LENGTH_SHORT).show();
+                        }
+                    } else {
+                        Toast.makeText(ctx, "Clipboard kosong", Toast.LENGTH_SHORT).show();
+                    }
+                } else {
+                    // Jika tidak ada akses sama sekali (jarang)
+                    Toast.makeText(ctx, "Tidak bisa membaca clipboard. Coba salin ulang.", Toast.LENGTH_SHORT).show();
+                }
+            } catch (Exception e) {
+                Toast.makeText(ctx, "Gagal: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+            } finally {
+                // 4. Kembalikan flag dan fokus
+                etKey.clearFocus();
+                etKey.setFocusableInTouchMode(false);
+                lp.flags = originalFlags;
+                try {
+                    wm.updateViewLayout(LoginView.this, lp);
+                } catch (Exception ignored) {}
+            }
+        }, 150); // 150ms cukup untuk fokus
     }
 
     private void attemptLogin() {
