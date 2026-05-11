@@ -729,10 +729,10 @@ public class OverlayView extends LinearLayout {
                 java.nio.ByteBuffer bb = java.nio.ByteBuffer.allocate(88);
                 bb.order(java.nio.ByteOrder.LITTLE_ENDIAN);
                 
-                // 1. Security Header
-                bb.putInt(0x4D4C4242); // MAGIC "MLBB"
-                long expiry = authManager.getExpiryTimestamp(); // dari KeyAuthManager
-                bb.putLong(expiry);
+              // 1. Security Header
+bb.putInt(0x4D4C4242); // MAGIC "MLBB"
+long expirySeconds = authManager.getExpiryTimestamp();
+bb.putLong(expirySeconds * 1000); // KIRIM DALAM MILIDETIK
 
                 // 2. Config Data
                 int lingMode = prefs.getInt("ling_mode", 0);
