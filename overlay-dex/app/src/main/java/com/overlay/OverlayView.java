@@ -591,14 +591,21 @@ public class OverlayView extends LinearLayout {
         c.addView(lr);
         SeekBar sb = new SeekBar(ctx); sb.setMax(100);
         sb.setProgress((int)(((cur-min)/(max-min))*100)); sb.setPadding(0, dp(4), 0, 0);
+        
         sb.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override public void onProgressChanged(SeekBar s, int p, boolean u) {
-                float v = min+((max-min)*(p/100f)); prefs.edit().putFloat(key,v).apply();
-                sendConfigToCpp(prefs);
-                tv.setText(String.format("%.0f",v)); radar.invalidate();
+                // Hanya update teks UI saat digeser, JANGAN render ulang radar / simpan data disini
+                float v = min+((max-min)*(p/100f));
+                tv.setText(String.format("%.0f", v)); 
             }
             @Override public void onStartTrackingTouch(SeekBar s) {}
-            @Override public void onStopTrackingTouch(SeekBar s) {}
+            @Override public void onStopTrackingTouch(SeekBar s) {
+                // Eksekusi berat hanya saat jari dilepas
+                float v = min+((max-min)*(s.getProgress()/100f)); 
+                prefs.edit().putFloat(key, v).apply();
+                sendConfigToCpp(prefs);
+                radar.invalidate();
+            }
         });
         c.addView(sb); return c;
     }

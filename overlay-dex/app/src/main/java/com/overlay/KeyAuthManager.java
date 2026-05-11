@@ -38,36 +38,47 @@ public class KeyAuthManager {
         this.mainHandler = new Handler(Looper.getMainLooper());
     }
 
-    // Simpan plain key terenkripsi
-    public void saveEncryptedKey(String plainKey) {
+// Simpan key dan expiry terenkripsi dalam satu kesatuan
+    public void saveEncryptedData(String plainKey, long expirySec) {
         try {
-            String encrypted = encrypt(plainKey);
+            String data = plainKey + "|" + expirySec;
+            String encrypted = encrypt(data);
             prefs.edit().putString(KEY_SAVED_KEY, encrypted).apply();
         } catch (Exception ignored) {}
     }
 
-    // Ambil plain key asli
-    public String getPlainKey() {
+    // Ambil array data [0] = plainKey, [1] = expirySec
+    private String[] getDecryptedData() {
         try {
             String encrypted = prefs.getString(KEY_SAVED_KEY, null);
             if (encrypted == null) return null;
-            return decrypt(encrypted);
+            String decrypted = decrypt(encrypted);
+            return decrypted.split("\\|");
         } catch (Exception e) {
             return null;
         }
     }
 
+    public String getPlainKey() {
+        String[] data = getDecryptedData();
+        return (data != null && data.length == 2) ? data[0] : null;
+    }
+
     public long getExpiryTimestamp() {
-        return prefs.getLong(KEY_EXPIRY, 0);
+        String[] data = getDecryptedData();
+        if (data != null && data.length == 2) {
+            try { return Long.parseLong(data[1]); } catch (Exception e) {}
+        }
+        return 0;
     }
 
     public boolean isKeyValid() {
-        long expiry = prefs.getLong(KEY_EXPIRY, 0);
-        return System.currentTimeMillis() / 1000 < expiry;
+        long expiry = getExpiryTimestamp();
+        return (System.currentTimeMillis() / 1000) < expiry;
     }
 
     public long getRemainingTime() {
-        long expiry = prefs.getLong(KEY_EXPIRY, 0);
+        long expiry = getExpiryTimestamp();
         return Math.max(0, expiry - (System.currentTimeMillis() / 1000));
     }
 
@@ -81,7 +92,8 @@ public class KeyAuthManager {
                 conn.setRequestMethod("GET");
                 conn.setConnectTimeout(15000);
                 conn.setReadTimeout(15000);
-                conn.setRequestProperty("User-Agent", "Mozilla/5.0");
+                // Matikan cache agar mendapat waktu server absolut (mencegah time spoofing)
+                conn.setRequestProperty("Cache-Control", "no-cache");
                 conn.setUseCaches(false);
 
                 int responseCode = conn.getResponseCode();
@@ -90,6 +102,9 @@ public class KeyAuthManager {
                     mainHandler.post(() -> callback.onFailure("Server error: " + code));
                     return;
                 }
+
+                // AMBIL WAKTU SERVER (Bypass perlindungan ganti tanggal HP saat login)
+                long serverTimeSec = conn.getHeaderFieldDate("Date", System.currentTimeMillis()) / 1000;
 
                 BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream()));
                 String line;
@@ -106,10 +121,9 @@ public class KeyAuthManager {
                 reader.close();
 
                 if (found) {
-                    long now = System.currentTimeMillis() / 1000;
-                    if (now < expiry) {
-                        saveEncryptedKey(userKey);
-                        prefs.edit().putLong(KEY_EXPIRY, expiry).apply();
+                    if (serverTimeSec < expiry) {
+                        // Enkripsi dan simpan keduanya
+                        saveEncryptedData(userKey, expiry);
                         mainHandler.post(callback::onSuccess);
                     } else {
                         mainHandler.post(() -> callback.onFailure("Key sudah expired!"));
