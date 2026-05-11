@@ -20,7 +20,7 @@ public class KeyAuthManager {
     // URL dari Github User
     private static final String KEY_DB_URL = "https://raw.githubusercontent.com/Nizararap/Internal-keys/refs/heads/main/keys.json";
     
-    private final SharedPreferences prefs;
+    public final SharedPreferences prefs;
     private final SharedPreferences modPrefs;
     private final Handler mainHandler;
 
