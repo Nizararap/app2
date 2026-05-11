@@ -1,4 +1,4 @@
-name: Build Overlay DEX
+name: Build Overlay DEX & Obfuscate Assets
 
 on:
   push:
@@ -33,34 +33,58 @@ jobs:
             "platforms;android-33" \
             "build-tools;33.0.2"
 
+      # Build APK di dalam folder overlay-dex
       - name: Build Debug APK
+        working-directory: ./overlay-dex
         run: gradle assembleDebug
 
+      # Ekstrak DEX dan siapkan folder output di Root
       - name: Extract DEX via d8
         run: |
-          mkdir -p output
+          mkdir -p output_artifact/heroes
           D8=$ANDROID_SDK_ROOT/build-tools/33.0.2/d8
 
-          # Collect .class files dari module kita saja (bukan framework)
-          find app/build/intermediates/javac/debug -name "*.class" > /tmp/class_list.txt
-          echo "Found $(wc -l < /tmp/class_list.txt) class files:"
-          cat /tmp/class_list.txt
-
+          # Collect .class files dari module overlay-dex
+          find overlay-dex/app/build/intermediates/javac/debug -name "*.class" > /tmp/class_list.txt
+          
           # d8 compile ke single DEX
-          $D8 \
-            --output output/ \
-            --min-api 21 \
-            $(cat /tmp/class_list.txt)
+          $D8 --output output_artifact/ --min-api 21 $(cat /tmp/class_list.txt)
+          mv output_artifact/classes.dex output_artifact/classes2.dex
 
-          # Rename jadi classes2.dex untuk inject
-          mv output/classes.dex output/classes2.dex
+          # Copy inject.smali dan README
+          cp overlay-dex/smali/inject.smali output_artifact/inject.smali
+          cp overlay-dex/smali/README.md output_artifact/README.md
 
-          cp smali/inject.smali output/inject.smali
-          cp smali/README.md output/README.md
-          echo "Done. DEX size: $(wc -c < output/classes2.dex) bytes"
+      # Enkripsi PNG ke BIN
+      - name: Obfuscate PNG to BIN
+        run: |
+          python3 -c "
+          import os
+          key = 0x5B # KUNCI RAHASIA (Sama dengan yang di RadarView.java)
+          hero_dir = 'heroes' # Baca folder heroes di root repo
+          out_dir = 'output_artifact/heroes' # Simpan ke folder artifact
+          
+          if os.path.exists(hero_dir):
+              for f in os.listdir(hero_dir):
+                  if f.endswith('.png'):
+                      with open(os.path.join(hero_dir, f), 'rb') as inf:
+                          data = bytearray(inf.read())
+                      
+                      # Enkripsi byte per byte dengan XOR
+                      for i in range(len(data)):
+                          data[i] ^= key
+                          
+                      out_name = f.replace('.png', '.bin')
+                      with open(os.path.join(out_dir, out_name), 'wb') as outf:
+                          outf.write(data)
+              print('Berhasil Obfuscate semua gambar PNG ke BIN!')
+          else:
+              print('WARNING: Folder heroes tidak ditemukan di root!')
+          "
 
+      # Upload hasil akhir
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: overlay-dex-${{ github.run_number }}
-          path: output/
+          name: overlay-dex-build-${{ github.run_number }}
+          path: output_artifact/
