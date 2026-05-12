@@ -261,14 +261,12 @@ public class OverlayView extends LinearLayout {
         tabCombat = buildCombat(ctx);
         tabRoom   = buildRoomInfo(ctx);
 
-        // Optimasi Lebar: Dashboard & Radar dibuat lebih kompak (max width)
-        int compactWidth = dp(280);
-        tabDash.setLayoutParams(new FrameLayout.LayoutParams(compactWidth, LayoutParams.WRAP_CONTENT, Gravity.CENTER_HORIZONTAL));
-        tabRad.setLayoutParams(new FrameLayout.LayoutParams(compactWidth, LayoutParams.WRAP_CONTENT, Gravity.CENTER_HORIZONTAL));
-        
-        // Combat & Room Info tetap fleksibel / lebar
-        tabCombat.setLayoutParams(new FrameLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
-        tabRoom.setLayoutParams(new FrameLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
+        // Use consistent LayoutParams for all tabs to avoid layout shifts
+        FrameLayout.LayoutParams flp = new FrameLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
+        tabDash.setLayoutParams(flp);
+        tabRad.setLayoutParams(flp);
+        tabCombat.setLayoutParams(flp);
+        tabRoom.setLayoutParams(flp);
 
         frame.addView(tabDash);
         frame.addView(tabRad);
@@ -513,13 +511,23 @@ public class OverlayView extends LinearLayout {
 
         frame.removeAllViews();
 
-        tabDash   = buildDash(getContext());
-        tabRad    = buildRadar(getContext());
-        tabCombat = buildCombat(getContext());
+        Context ctx = getContext();
+        tabDash   = buildDash(ctx);
+        tabRad    = buildRadar(ctx);
+        tabCombat = buildCombat(ctx);
+        tabRoom   = buildRoomInfo(ctx);
+
+        // Apply consistent LayoutParams during refresh
+        FrameLayout.LayoutParams flp = new FrameLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
+        tabDash.setLayoutParams(flp);
+        tabRad.setLayoutParams(flp);
+        tabCombat.setLayoutParams(flp);
+        tabRoom.setLayoutParams(flp);
 
         frame.addView(tabDash);
         frame.addView(tabRad);
         frame.addView(tabCombat);
+        frame.addView(tabRoom);
 
         switchTab(0);
     }
