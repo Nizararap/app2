@@ -965,53 +965,77 @@ public class OverlayView extends LinearLayout {
         cardLp.setMargins(0, 0, 0, dp(6));
         card.setLayoutParams(cardLp);
 
-        // BAGIAN KIRI: Icon Hero & Icon Spell
+        // BAGIAN KIRI: Icon Hero & Icon Spell (Dengan Fallback ID)
         LinearLayout colLeft = new LinearLayout(ctx);
         colLeft.setOrientation(HORIZONTAL);
         colLeft.setGravity(Gravity.CENTER_VERTICAL);
         colLeft.setLayoutParams(new LayoutParams(dp(80), LayoutParams.WRAP_CONTENT));
         
         // --- 1. HERO ICON ---
+        FrameLayout heroContainer = new FrameLayout(ctx);
+        heroContainer.setLayoutParams(new LayoutParams(dp(36), dp(36)));
+
         android.widget.ImageView ivHero = new android.widget.ImageView(ctx);
-        ivHero.setLayoutParams(new LayoutParams(dp(36), dp(36)));
+        ivHero.setLayoutParams(new FrameLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
         ivHero.setScaleType(android.widget.ImageView.ScaleType.FIT_XY);
         
-        // FIX UNTUK BOT: Jika ID > 200, itu adalah Skin ID. Bagi 10 untuk dapat Hero ID asli!
-        int realHeroId = p.heroId;
-        if (realHeroId > 200) {
-            realHeroId = realHeroId / 10;
-        }
-
-        // Gunakan Translator ID ke Nama
-        String heroFileName = getHeroNameStr(realHeroId); 
+        // HAPUS RUMUS PEMBAGIAN / 10 YANG LAMA. KITA PAKA FULL ID!
+        String heroFileName = getHeroNameStr(p.heroId); 
         android.graphics.Bitmap heroBmp = radar.getRawIcon(heroFileName);
+
+        if (heroBmp == null && p.name != null) {
+            heroBmp = radar.getRawIcon(p.name.toLowerCase().replaceAll("[^a-z0-9]", ""));
+        }
 
         if (heroBmp != null) {
             ivHero.setImageBitmap(heroBmp);
+            heroContainer.addView(ivHero);
         } else {
-            // Gambar tidak ditemukan, kasih warna abu-abu
-            ivHero.setBackgroundColor(Color.DKGRAY);
+            // JIKA GAMBAR HERO TIDAK ADA, TAMPILKAN KOTAK + ANGKA ID
+            ivHero.setBackgroundColor(Color.parseColor("#444444"));
+            heroContainer.addView(ivHero);
+            
+            TextView tvHeroId = new TextView(ctx);
+            tvHeroId.setText(String.valueOf(p.heroId));
+            tvHeroId.setTextColor(Color.WHITE);
+            tvHeroId.setTextSize(9f);
+            tvHeroId.setGravity(Gravity.CENTER);
+            tvHeroId.setLayoutParams(new FrameLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
+            heroContainer.addView(tvHeroId);
         }
         
         // --- 2. SPELL ICON ---
-        android.widget.ImageView ivSpell = new android.widget.ImageView(ctx);
+        FrameLayout spellContainer = new FrameLayout(ctx);
         LayoutParams spellLp = new LayoutParams(dp(22), dp(22));
         spellLp.setMargins(dp(6), 0, 0, 0); 
-        ivSpell.setLayoutParams(spellLp);
+        spellContainer.setLayoutParams(spellLp);
+
+        android.widget.ImageView ivSpell = new android.widget.ImageView(ctx);
+        ivSpell.setLayoutParams(new FrameLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
         ivSpell.setScaleType(android.widget.ImageView.ScaleType.FIT_XY);
         
-        // Gunakan Translator Spell ID ke Nama
         String spellFileName = getSpellNameStr(p.spellId);
         android.graphics.Bitmap spellBmp = radar.getRawIcon(spellFileName);
         
         if (spellBmp != null) {
             ivSpell.setImageBitmap(spellBmp);
+            spellContainer.addView(ivSpell);
         } else {
-            ivSpell.setBackgroundColor(Color.GRAY);
+            // JIKA GAMBAR SPELL TIDAK ADA, TAMPILKAN KOTAK + ANGKA ID
+            ivSpell.setBackgroundColor(Color.parseColor("#444444"));
+            spellContainer.addView(ivSpell);
+            
+            TextView tvSpellId = new TextView(ctx);
+            tvSpellId.setText(String.valueOf(p.spellId)); // MENAMPILKAN ID SPELL ASLI DARI MLBB!
+            tvSpellId.setTextColor(Color.WHITE);
+            tvSpellId.setTextSize(6f);
+            tvSpellId.setGravity(Gravity.CENTER);
+            tvSpellId.setLayoutParams(new FrameLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
+            spellContainer.addView(tvSpellId);
         }
 
-        colLeft.addView(ivHero);
-        colLeft.addView(ivSpell);
+        colLeft.addView(heroContainer);
+        colLeft.addView(spellContainer);
 
         // BAGIAN TENGAH: Nama, UID, Level Akun
         LinearLayout colMid = new LinearLayout(ctx);
@@ -1064,6 +1088,8 @@ public class OverlayView extends LinearLayout {
 
         return card;
     }
+    
+    
     // Array Rank Lengkap 136 Index (Sesuai source C++ kamu)
     private final String[] strRank = {
         "Warrior III *1", "Warrior III *2", "Warrior III *3",
