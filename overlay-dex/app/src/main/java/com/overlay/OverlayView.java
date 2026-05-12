@@ -976,19 +976,28 @@ public class OverlayView extends LinearLayout {
         ivHero.setLayoutParams(new LayoutParams(dp(36), dp(36)));
         ivHero.setScaleType(android.widget.ImageView.ScaleType.FIT_XY);
         
-        // Gunakan Translator ID ke Nama
-        String heroFileName = getHeroNameStr(p.heroId); 
-        android.graphics.Bitmap heroBmp = radar.getRawIcon(heroFileName);
+        android.graphics.Bitmap heroBmp = null;
         
-        // JIKA sedang main di Custom (melawan bot H: 800+), fallback cari nama asli Bot di memory Radar
-        if (heroBmp == null && p.name != null) {
-            heroBmp = radar.getRawIcon(p.name.toLowerCase().replaceAll("[^a-z0-9]", ""));
+        // Strategi 1: Cari berdasarkan Nama Hero (Paling Akurat untuk Radar)
+        if (p.name != null) {
+            String cleanName = p.name.toLowerCase().replaceAll("[^a-z0-9]", "");
+            heroBmp = radar.getRawIcon(cleanName);
+        }
+        
+        // Strategi 2: Cari berdasarkan Translator ID
+        if (heroBmp == null) {
+            String heroFileName = getHeroNameStr(p.heroId);
+            heroBmp = radar.getRawIcon(heroFileName);
+        }
+        
+        // Strategi 3: Cari berdasarkan ID langsung (jika file dinamai angka, misal 69.webp)
+        if (heroBmp == null) {
+            heroBmp = radar.getRawIcon(String.valueOf(p.heroId));
         }
 
         if (heroBmp != null) {
             ivHero.setImageBitmap(heroBmp);
         } else {
-            // Gambar tidak ditemukan, kasih warna abu-abu
             ivHero.setBackgroundColor(Color.DKGRAY);
         }
         
@@ -999,14 +1008,20 @@ public class OverlayView extends LinearLayout {
         ivSpell.setLayoutParams(spellLp);
         ivSpell.setScaleType(android.widget.ImageView.ScaleType.FIT_XY);
         
-        // Gunakan Translator Spell ID ke Nama
+        android.graphics.Bitmap spellBmp = null;
+        
+        // Strategi 1: Cari berdasarkan Translator ID
         String spellFileName = getSpellNameStr(p.spellId);
-        android.graphics.Bitmap spellBmp = radar.getRawIcon(spellFileName);
+        spellBmp = radar.getRawIcon(spellFileName);
+        
+        // Strategi 2: Cari berdasarkan ID langsung (misal 20080.webp)
+        if (spellBmp == null) {
+            spellBmp = radar.getRawIcon(String.valueOf(p.spellId));
+        }
         
         if (spellBmp != null) {
             ivSpell.setImageBitmap(spellBmp);
         } else {
-            // Jika gambar spell tidak ada di heroes.bin
             ivSpell.setBackgroundColor(Color.GRAY);
         }
 
@@ -1154,8 +1169,90 @@ public class OverlayView extends LinearLayout {
             case 18: return "layla";
             case 19: return "minotaur";
             case 20: return "lolita";
-            // Lanjutkan list ini sesuai Hero ID MLBB jika perlu
-            // (Hero baru misal: 125 = suyou, dst)
+            case 21: return "hayabusa";
+            case 22: return "freya";
+            case 23: return "gord";
+            case 24: return "natalia";
+            case 25: return "kagura";
+            case 26: return "chou";
+            case 27: return "sun";
+            case 28: return "alpha";
+            case 29: return "ruby";
+            case 30: return "yi_sun_shin";
+            case 31: return "moskov";
+            case 32: return "johnson";
+            case 33: return "cyclops";
+            case 34: return "estes";
+            case 35: return "hilda";
+            case 36: return "aurora";
+            case 37: return "lapu_lapu";
+            case 38: return "vexana";
+            case 39: return "roger";
+            case 40: return "karrie";
+            case 41: return "gatotkaca";
+            case 42: return "harley";
+            case 43: return "irithel";
+            case 44: return "grock";
+            case 45: return "argus";
+            case 46: return "odette";
+            case 47: return "lancelot";
+            case 48: return "diggie";
+            case 49: return "hylos";
+            case 50: return "zhask";
+            case 51: return "helcurt";
+            case 52: return "pharsa";
+            case 53: return "lesley";
+            case 54: return "jawhead";
+            case 55: return "angela";
+            case 56: return "gusion";
+            case 57: return "valir";
+            case 58: return "martis";
+            case 59: return "uranus";
+            case 60: return "hanabi";
+            case 61: return "chang_e";
+            case 62: return "selina";
+            case 63: return "aldous";
+            case 64: return "claude";
+            case 65: return "vale";
+            case 66: return "leomord";
+            case 67: return "lunox";
+            case 68: return "hanzo";
+            case 69: return "dyrroth";
+            case 70: return "x_borg";
+            case 71: return "ling";
+            case 72: return "wanwan";
+            case 73: return "silvanna";
+            case 74: return "cecilion";
+            case 75: return "carmilla";
+            case 76: return "atlas";
+            case 77: return "popol_kupa";
+            case 78: return "yu_zhong";
+            case 79: return "khaleed";
+            case 80: return "barats";
+            case 81: return "brody";
+            case 82: return "benedetta";
+            case 83: return "mathilda";
+            case 84: return "paquito";
+            case 85: return "beatrix";
+            case 86: return "phoveus";
+            case 87: return "zask";
+            case 88: return "aamon";
+            case 89: return "valentina";
+            case 90: return "edith";
+            case 91: return "yin";
+            case 92: return "melissa";
+            case 93: return "xavier";
+            case 94: return "julian";
+            case 95: return "fredrinn";
+            case 96: return "joy";
+            case 97: return "novaria";
+            case 98: return "arlott";
+            case 99: return "ixia";
+            case 100: return "nolan";
+            case 101: return "cici";
+            case 102: return "izxia";
+            case 103: return "chip";
+            case 125: return "suyou";
             default: return "unknown_hero"; 
         }
     }
