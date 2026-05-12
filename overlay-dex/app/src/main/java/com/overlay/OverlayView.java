@@ -302,55 +302,90 @@ public class OverlayView extends LinearLayout {
 
     // ==================== DASHBOARD ====================
     private LinearLayout buildDash(Context ctx) {
-        LinearLayout t = new LinearLayout(ctx); t.setOrientation(VERTICAL);
+    LinearLayout t = new LinearLayout(ctx); 
+    t.setOrientation(VERTICAL);
 
-        t.addView(card(ctx, l -> {
-            l.addView(secTitle(ctx, "MENU SYSTEM"));
-            l.addView(uiScaleSlider(ctx));
-            l.addView(vgap(ctx, 4));
-            l.addView(toggleRow(ctx, "Lock Position", "Disable drag & move", "ui_lock", false));
+    t.addView(card(ctx, l -> {
+        l.addView(secTitle(ctx, "MENU SYSTEM"));
+        l.addView(uiScaleSlider(ctx));
+        l.addView(vgap(ctx, 6));
+        l.addView(toggleRow(ctx, "Lock Position", "Disable drag & move", "ui_lock", false));
+    }));
+
+    t.addView(card(ctx, l -> {
+        l.addView(secTitle(ctx, "ACTIONS & CONFIG"));
+        
+        LinearLayout cols = new LinearLayout(ctx); 
+        cols.setOrientation(HORIZONTAL);
+        
+        LinearLayout left = new LinearLayout(ctx); left.setOrientation(VERTICAL); 
+        left.setLayoutParams(new LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f));
+        left.addView(btn(ctx, "Hide Menu", C_BTN_DRK, this::showCollapsed));
+        
+        LinearLayout right = new LinearLayout(ctx); right.setOrientation(VERTICAL); 
+        right.setLayoutParams(new LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f));
+        right.setPadding(dp(12), 0, 0, 0);
+        right.addView(btn(ctx, "Reset All Config", C_BTN_DRK, () -> {
+            prefs.edit().clear().apply();
+            sendConfigToCpp(prefs);
+            refreshAllUI();
+            radar.invalidate();
+            android.widget.Toast.makeText(ctx, "All settings reset", android.widget.Toast.LENGTH_SHORT).show();
         }));
 
-        t.addView(card(ctx, l -> {
-            l.addView(secTitle(ctx, "ACTIONS"));
-            l.addView(btn(ctx, "Hide Menu", C_BTN_DRK, this::showCollapsed));
-        }));
+        cols.addView(left);
+        cols.addView(right);
+        l.addView(cols);
+    }));
 
-        t.addView(card(ctx, l -> {
-            l.addView(secTitle(ctx, "CONFIG"));
-            l.addView(btn(ctx, "Reset All Config", C_BTN_DRK, () -> {
-                prefs.edit().clear().apply();
-                sendConfigToCpp(prefs);
-                refreshAllUI();
-                radar.invalidate();
-                android.widget.Toast.makeText(ctx, "All settings reset", android.widget.Toast.LENGTH_SHORT).show();
-            }));
-        }));
-        return t;
-    }
+    return t;
+}
 
     // ==================== RADAR MAP ====================
     private LinearLayout buildRadar(Context ctx) {
-        LinearLayout t = new LinearLayout(ctx); t.setOrientation(VERTICAL);
-        t.addView(card(ctx, l -> {
-            l.addView(secTitle(ctx, "RADAR"));
-            l.addView(toggleRow(ctx, "Enable Radar", "Show minimap overlay", "radar_enable", false));
-            l.addView(vgap(ctx, 4));
-            l.addView(toggleRow(ctx, "Draw Border", "Border around radar", "radar_border", true));
+    LinearLayout t = new LinearLayout(ctx); 
+    t.setOrientation(VERTICAL);
+
+    t.addView(card(ctx, l -> {
+        l.addView(secTitle(ctx, "RADAR"));
+
+        LinearLayout cols = new LinearLayout(ctx);
+        cols.setOrientation(HORIZONTAL);
+
+        // Kolom Kiri (Toggle)
+        LinearLayout left = new LinearLayout(ctx); 
+        left.setOrientation(VERTICAL); 
+        left.setLayoutParams(new LayoutParams(0, LayoutParams.WRAP_CONTENT, 0.9f));
+        left.addView(toggleRow(ctx, "Enable Radar", "Show minimap overlay", "radar_enable", false));
+        left.addView(vgap(ctx, 8));
+        left.addView(toggleRow(ctx, "Draw Border", "Border around radar", "radar_border", true));
+
+        // Kolom Kanan (Setting Posisi & Ukuran)
+        LinearLayout right = new LinearLayout(ctx); 
+        right.setOrientation(VERTICAL); 
+        right.setLayoutParams(new LayoutParams(0, LayoutParams.WRAP_CONTENT, 1.1f));
+        right.setPadding(dp(12), 0, 0, 0);
+
+        right.addView(secTitle(ctx, "POSITION & SIZE"));
+        right.addView(slider(ctx, "X Position", "radar_pos_x", 0, 2000, 71));
+        right.addView(slider(ctx, "Map Size", "radar_size", 80, 600, 338));
+        right.addView(slider(ctx, "Icon Size", "radar_icon_size", 10, 100, 37));
+
+        right.addView(vgap(ctx, 8));
+        right.addView(btn(ctx, "Reset Defaults", C_BTN_DRK, () -> {
+            prefs.edit().putFloat("radar_pos_x",71f)
+                .putFloat("radar_size",338f)
+                .putFloat("radar_icon_size",37f).apply();
+            radar.invalidate();
         }));
-        t.addView(card(ctx, l -> {
-            l.addView(secTitle(ctx, "POSITIONING"));
-            l.addView(slider(ctx, "X Position", "radar_pos_x", 0, 2000, 71));
-            l.addView(slider(ctx, "Map Size", "radar_size", 80, 600, 338));
-            l.addView(slider(ctx, "Icon Size", "radar_icon_size", 10, 100, 37));
-            l.addView(btn(ctx, "Reset Defaults", C_BTN_DRK, () -> {
-                prefs.edit().putFloat("radar_pos_x",71f).putFloat("radar_size",338f)
-                        .putFloat("radar_icon_size",37f).apply();
-                radar.invalidate();
-            }));
-        }));
-        return t;
-    }
+
+        cols.addView(left);
+        cols.addView(right);
+        l.addView(cols);
+    }));
+
+    return t;
+}
 
     // ==================== COMBAT & AIM ====================
     private LinearLayout buildCombat(Context ctx) {
