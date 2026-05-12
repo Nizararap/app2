@@ -196,29 +196,33 @@ public class OverlayView extends LinearLayout {
     if (tabRad    != null) tabRad.setVisibility(idx == 1 ? VISIBLE : GONE);
     if (tabCombat != null) tabCombat.setVisibility(idx == 2 ? VISIBLE : GONE);
     if (tabRoom   != null) tabRoom.setVisibility(idx == 3 ? VISIBLE : GONE);
+       // ✅ Biar panel langsung resize
+    panel.requestLayout();
     }
 
     private View buildContent(Context ctx) {
-        scrollView = new ScrollView(ctx);
-        scrollView.setFillViewport(false);
+    scrollView = new ScrollView(ctx);
+    scrollView.setFillViewport(false);
 
-        FrameLayout frame = new FrameLayout(ctx);
-        frame.setPadding(dp(10), dp(8), dp(10), dp(10));
+    FrameLayout frame = new FrameLayout(ctx);
+    frame.setPadding(dp(10), dp(8), dp(10), dp(10));
 
-        tabDash   = buildDash(ctx);
-        tabRad    = buildRadar(ctx);
-        tabCombat = buildCombat(ctx);
-        tabRoom   = buildRoomInfo(ctx);
+    tabDash   = buildDash(ctx);
+    tabRad    = buildRadar(ctx);
+    tabCombat = buildCombat(ctx);
+    tabRoom   = buildRoomInfo(ctx);
 
-        frame.addView(tabDash);
-        frame.addView(tabRad);
-        frame.addView(tabCombat);
-        scrollView.addView(frame);
-        frame.addView(tabRoom); // TAMBAHAN
+    frame.addView(tabDash);
+    frame.addView(tabRad);
+    frame.addView(tabCombat);
+    frame.addView(tabRoom);
 
-        scrollView.setLayoutParams(new LayoutParams(LayoutParams.MATCH_PARENT,
-                LayoutParams.WRAP_CONTENT));
+    // ✅ PERBAIKAN: Tambahkan parameter LayoutParams WRAP_CONTENT
+    scrollView.addView(frame, new FrameLayout.LayoutParams(
+            ViewGroup.LayoutParams.WRAP_CONTENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT));
 
+    
         int statusBarH = 0;
         try {
             int resId = ctx.getResources().getIdentifier("status_bar_height", "dimen", "android");
@@ -280,11 +284,6 @@ public class OverlayView extends LinearLayout {
             l.addView(vgap(ctx, 4));
             l.addView(toggleRow(ctx, "Draw Border", "Border around radar", "radar_border", true));
         }));
-        // ========== MAP HEAD ICON TOGGLE ==========
-t.addView(card(ctx, l -> {
-    l.addView(secTitle(ctx, "MAP HEAD ICON"));
-    l.addView(toggleRow(ctx, "Show All Icons", "Override minimap icon visibility", "map_head_allshow", false));
-}));
         t.addView(card(ctx, l -> {
             l.addView(secTitle(ctx, "POSITIONING"));
             l.addView(slider(ctx, "X Position", "radar_pos_x", 0, 2000, 71));
@@ -1310,7 +1309,7 @@ t.addView(card(ctx, l -> {
                 java.io.OutputStream out = socket.getOutputStream();
                 
                 // [MAGIC:4] [EXPIRY:8] [CONFIG_DATA:76] = 88 bytes
-                java.nio.ByteBuffer bb = java.nio.ByteBuffer.allocate(92);
+                java.nio.ByteBuffer bb = java.nio.ByteBuffer.allocate(88);
                 bb.order(java.nio.ByteOrder.LITTLE_ENDIAN);
                 
               // 1. Security Header
@@ -1346,13 +1345,10 @@ bb.putLong(expirySeconds * 1000); // KIRIM DALAM MILIDETIK
                 String heroName = prefs.getString("locked_hero_name", "");
                 byte[] nameBytes = heroName.getBytes();
                 byte[] finalName = new byte[32];
-System.arraycopy(nameBytes, 0, finalName, 0, Math.min(nameBytes.length, 31));
-bb.put(finalName);
+                System.arraycopy(nameBytes, 0, finalName, 0, Math.min(nameBytes.length, 31));
+                bb.put(finalName);
 
-// MAP HEAD ALLSHOW
-bb.putInt(prefs.getBoolean("map_head_allshow", false) ? 1 : 0);  // << TAMBAHKAN
-
-out.write(bb.array());
+                out.write(bb.array());
                 out.flush();
                 socket.close();
             } catch (Exception ignored) {}
