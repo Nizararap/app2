@@ -823,7 +823,12 @@ public class OverlayView extends LinearLayout {
         t.setOrientation(VERTICAL);
 
         t.addView(card(ctx, l -> {
-            l.addView(secTitle(ctx, "DRAFT PICK / LOADING SCREEN"));
+            l.addView(secTitle(ctx, "ROOM INFO & DRAFT PICK"));
+            
+            // TOMBOL ON/OFF AGAR TIDAK BIKIN LAG!
+            l.addView(toggleRow(ctx, "Enable Room Info", "Tampilkan data pemain saat Draft Pick", "room_info_enable", false));
+            l.addView(vgap(ctx, 10));
+
             roomTableContainer = new LinearLayout(ctx);
             roomTableContainer.setOrientation(VERTICAL);
             l.addView(roomTableContainer);
@@ -837,76 +842,221 @@ public class OverlayView extends LinearLayout {
         return t;
     }
 
+    // Class pembantu untuk menyimpan data parsing sementara
+    private static class RoomPlayerData {
+        int camp, uid, zone, heroId, rank, mythPt, matches, wins, accLv, spellId, countryId;
+        boolean isLeader;
+        String name;
+    }
+
     private void startRoomSocketThread() {
-    new Thread(() -> {
-        while (isRoomSocketRunning) {
-            android.net.LocalSocket socket = null;
-            java.io.DataInputStream dis = null;
-            try {
-                socket = new android.net.LocalSocket();
-                socket.connect(new android.net.LocalSocketAddress("mlbb_room_socket", android.net.LocalSocketAddress.Namespace.ABSTRACT));
-                dis = new java.io.DataInputStream(socket.getInputStream());
+        new Thread(() -> {
+            while (isRoomSocketRunning) {
+                android.net.LocalSocket socket = null;
+                java.io.DataInputStream dis = null;
+                try {
+                    socket = new android.net.LocalSocket();
+                    socket.connect(new android.net.LocalSocketAddress("mlbb_room_socket", android.net.LocalSocketAddress.Namespace.ABSTRACT));
+                    dis = new java.io.DataInputStream(socket.getInputStream());
 
-                byte[] countBuf = new byte[4];
-                byte[] packetBuf = new byte[68];
+                    byte[] countBuf = new byte[4];
+                    // UKURAN BARU: 12 integer * 4 bytes + 32 char bytes = 80 Bytes!
+                    byte[] packetBuf = new byte[80];
 
-                while (isRoomSocketRunning) {
-                    dis.readFully(countBuf);
-                    int count = java.nio.ByteBuffer.wrap(countBuf).order(java.nio.ByteOrder.LITTLE_ENDIAN).getInt();
-                    if (count > 10 || count < 0) count = 0;
+                    while (isRoomSocketRunning) {
+                        dis.readFully(countBuf);
+                        int count = java.nio.ByteBuffer.wrap(countBuf).order(java.nio.ByteOrder.LITTLE_ENDIAN).getInt();
+                        if (count > 10 || count < 0) count = 0;
 
-                    final StringBuilder sbUi = new StringBuilder();
-                    for (int i = 0; i < count; i++) {
-                        dis.readFully(packetBuf);
-                        java.nio.ByteBuffer bb = java.nio.ByteBuffer.wrap(packetBuf).order(java.nio.ByteOrder.LITTLE_ENDIAN);
+                        final java.util.List<RoomPlayerData> players = new java.util.ArrayList<>();
+                        
+                        // KITA SELALU BACA DATA DARI C++ AGAR BUFFER TIDAK PENUH,
+                        // TAPI KITA HANYA RENDER JIKA TOGGLE DIAKTIFKAN.
+                        boolean isEnabled = prefs.getBoolean("room_info_enable", false);
 
-                        int camp = bb.getInt();
-                        int uid = bb.getInt();
-                        int zone = bb.getInt();
-                        int heroId = bb.getInt();
-                        int rank = bb.getInt();
-                        int mythPt = bb.getInt();
-                        int matches = bb.getInt();
-                        int wins = bb.getInt();
-                        int accLv = bb.getInt();
+                        for (int i = 0; i < count; i++) {
+                            dis.readFully(packetBuf);
+                            
+                            if (!isEnabled) continue; // Jangan buang CPU parse jika dimatikan
 
-                        byte[] nameBytes = new byte[32];
-                        bb.get(nameBytes);
-                        String name = new String(nameBytes).trim();
+                            java.nio.ByteBuffer bb = java.nio.ByteBuffer.wrap(packetBuf).order(java.nio.ByteOrder.LITTLE_ENDIAN);
+                            RoomPlayerData p = new RoomPlayerData();
+                            p.camp = bb.getInt();
+                            p.uid = bb.getInt();
+                            p.zone = bb.getInt();
+                            p.heroId = bb.getInt();
+                            p.rank = bb.getInt();
+                            p.mythPt = bb.getInt();
+                            p.matches = bb.getInt();
+                            p.wins = bb.getInt();
+                            p.accLv = bb.getInt();
+                            p.spellId = bb.getInt();
+                            p.countryId = bb.getInt();
+                            p.isLeader = bb.getInt() == 1;
 
-                        float wr = (matches > 0) ? ((float)wins / matches * 100f) : 0f;
-                        String teamStr = (camp == 1) ? "[TEAM]" : (camp == 2 ? "[ENEMY]" : "[?]");
-                        sbUi.append(teamStr).append(" ").append(name)
-                            .append("\nUID: ").append(uid).append("(").append(zone).append(")")
-                            .append(" | HeroID: ").append(heroId)
-                            .append("\nRank: ID ").append(rank).append(" (*").append(mythPt).append(")")
-                            .append(" | WR: ").append(String.format("%.1f%%", wr)).append(" (").append(matches).append(" Match)")
-                            .append("\n\n");
-                    }
-
-                    // 👇 Salin ke variabel final agar bisa dipakai di lambda
-                    final int finalCount = count;
-                    final StringBuilder finalSbUi = sbUi;
-                    post(() -> {
-                        if (roomTableContainer != null) {
-                            roomTableContainer.removeAllViews();
-                            TextView tv = new TextView(getContext());
-                            tv.setText(finalCount == 0 ? "Waiting for match / No data..." : finalSbUi.toString());
-                            tv.setTextColor(C_TEXT);
-                            tv.setTextSize(11f);
-                            roomTableContainer.addView(tv);
+                            byte[] nameBytes = new byte[32];
+                            bb.get(nameBytes);
+                            p.name = new String(nameBytes).trim();
+                            
+                            players.add(p);
                         }
-                    });
+
+                        // Update UI di Main Thread
+                        post(() -> {
+                            if (roomTableContainer == null) return;
+                            roomTableContainer.removeAllViews();
+                            
+                            if (!isEnabled) {
+                                TextView tv = new TextView(getContext());
+                                tv.setText("Room Info is Disabled. Turn on to view.");
+                                tv.setTextColor(C_SUBTEXT);
+                                tv.setTextSize(12f);
+                                roomTableContainer.addView(tv);
+                                return;
+                            }
+
+                            if (players.isEmpty()) {
+                                TextView tv = new TextView(getContext());
+                                tv.setText("Waiting for Match / Draft Pick...");
+                                tv.setTextColor(C_ACCENT);
+                                tv.setTextSize(12f);
+                                roomTableContainer.addView(tv);
+                                return;
+                            }
+
+                            // Render Card per pemain (Cantik & Rapi)
+                            for (RoomPlayerData p : players) {
+                                roomTableContainer.addView(createPlayerCard(p));
+                            }
+                        });
+                    }
+                } catch (Exception e) {
+                    try { Thread.sleep(2000); } catch (InterruptedException ignored) {}
+                } finally {
+                    try { if (dis != null) dis.close(); } catch (Exception ignored) {}
+                    try { if (socket != null) socket.close(); } catch (Exception ignored) {}
                 }
-            } catch (Exception e) {
-                try { Thread.sleep(2000); } catch (InterruptedException ignored) {}
-            } finally {
-                try { if (dis != null) dis.close(); } catch (Exception ignored) {}
-                try { if (socket != null) socket.close(); } catch (Exception ignored) {}
             }
+        }).start();
+    }
+
+    // ==========================================
+    // UI BUILDER UNTUK PLAYER CARD (DESAIN MOD PREMIUM)
+    // ==========================================
+    private View createPlayerCard(RoomPlayerData p) {
+        Context ctx = getContext();
+        LinearLayout card = new LinearLayout(ctx);
+        card.setOrientation(HORIZONTAL);
+        card.setPadding(dp(8), dp(8), dp(8), dp(8));
+        
+        GradientDrawable bg = new GradientDrawable();
+        // Bedakan warna border berdasar tim
+        if (p.camp == 1) {
+            bg.setColor(Color.parseColor("#102030"));
+            bg.setStroke(dp(1), Color.parseColor("#1565C0")); // Biru Team
+        } else {
+            bg.setColor(Color.parseColor("#301010"));
+            bg.setStroke(dp(1), Color.parseColor("#C62828")); // Merah Enemy
         }
-    }).start();
-}
+        bg.setCornerRadius(dp(8));
+        card.setBackground(bg);
+        
+        LayoutParams cardLp = new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
+        cardLp.setMargins(0, 0, 0, dp(6));
+        card.setLayoutParams(cardLp);
+
+        // BAGIAN KIRI: Info Dasar (Hero & ID)
+        LinearLayout colLeft = new LinearLayout(ctx);
+        colLeft.setOrientation(VERTICAL);
+        colLeft.setLayoutParams(new LayoutParams(dp(70), LayoutParams.WRAP_CONTENT));
+        
+        TextView tvHero = new TextView(ctx);
+        tvHero.setText("H: " + p.heroId);
+        tvHero.setTextColor(Color.WHITE);
+        tvHero.setTextSize(10f);
+        
+        TextView tvSpell = new TextView(ctx);
+        tvSpell.setText("S: " + p.spellId);
+        tvSpell.setTextColor(Color.LTGRAY);
+        tvSpell.setTextSize(10f);
+
+        colLeft.addView(tvHero);
+        colLeft.addView(tvSpell);
+
+        // BAGIAN TENGAH: Nama & UID
+        LinearLayout colMid = new LinearLayout(ctx);
+        colMid.setOrientation(VERTICAL);
+        colMid.setLayoutParams(new LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f));
+        
+        TextView tvName = new TextView(ctx);
+        String leaderIcon = p.isLeader ? "👑 " : "";
+        tvName.setText(leaderIcon + p.name);
+        tvName.setTextColor(C_TEXT);
+        tvName.setTextSize(12f);
+        tvName.setTypeface(null, Typeface.BOLD);
+        tvName.setSingleLine(true);
+
+        TextView tvUid = new TextView(ctx);
+        tvUid.setText("UID: " + p.uid + " Lv." + p.accLv);
+        tvUid.setTextColor(C_SUBTEXT);
+        tvUid.setTextSize(9f);
+
+        colMid.addView(tvName);
+        colMid.addView(tvUid);
+
+        // BAGIAN KANAN: Rank & Winrate
+        LinearLayout colRight = new LinearLayout(ctx);
+        colRight.setOrientation(VERTICAL);
+        colRight.setGravity(Gravity.END);
+        
+        TextView tvRank = new TextView(ctx);
+        tvRank.setText(getRankName(p.rank, p.mythPt));
+        tvRank.setTextColor(Color.parseColor("#FFD700")); // Warna Emas
+        tvRank.setTextSize(10f);
+        tvRank.setTypeface(null, Typeface.BOLD);
+
+        float wr = (p.matches > 0) ? ((float)p.wins / p.matches * 100f) : 0f;
+        TextView tvWr = new TextView(ctx);
+        tvWr.setText(String.format("%.1f%% (%d M)", wr, p.matches));
+        tvWr.setTextSize(10f);
+        // Warnai WR: Hijau > 60%, Merah < 48%, sisanya abu-abu
+        if (wr > 60.0f) tvWr.setTextColor(C_GREEN);
+        else if (wr < 48.0f && p.matches > 10) tvWr.setTextColor(Color.parseColor("#EF5350"));
+        else tvWr.setTextColor(Color.LTGRAY);
+
+        colRight.addView(tvRank);
+        colRight.addView(tvWr);
+
+        card.addView(colLeft);
+        card.addView(colMid);
+        card.addView(colRight);
+
+        return card;
+    }
+private final String[] strRank = {
+        "Warrior III", "Warrior II", "Warrior I",
+        "Elite III", "Elite II", "Elite I",
+        "Master IV", "Master III", "Master II", "Master I",
+        "Grandmaster V", "Grandmaster IV", "Grandmaster III", "Grandmaster II", "Grandmaster I",
+        "Epic V", "Epic IV", "Epic III", "Epic II", "Epic I",
+        "Legend V", "Legend IV", "Legend III", "Legend II", "Legend I"
+    };
+
+    private String getRankName(int rankLevel, int mythPoint) {
+        if (rankLevel <= 0) return "Unranked";
+        if (rankLevel <= 136) { // Dibawah Mythic
+            int index = (rankLevel / 5) - 1; // Konversi kasar, biasanya game kirim index berurutan
+            if (index >= 0 && index < strRank.length) return strRank[index];
+            return "Epic/Legend"; 
+        } else {
+            int star = rankLevel - 136; // C# Code MLBB
+            if (star > 99) return "Immortal *" + star;
+            if (star > 49) return "Glory *" + star;
+            if (star > 24) return "Honor *" + star;
+            return "Mythic *" + star;
+        }
+    }
+
 
     // ==================== PENGIRIMAN SOCKET KE C++ ====================
     private void sendConfigToCpp(SharedPreferences prefs) {
