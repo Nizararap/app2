@@ -71,7 +71,7 @@ jobs:
               zip_buffer = io.BytesIO()
               with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zf:
                   for f in os.listdir(hero_dir):
-                      if f.endswith('.png'):
+                      if f.endswith('.png') or f.endswith('.webp'):
                           # Masukkan file png ke dalam ZIP
                           zf.write(os.path.join(hero_dir, f), arcname=f)
               

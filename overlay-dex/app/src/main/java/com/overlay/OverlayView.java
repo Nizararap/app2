@@ -940,8 +940,8 @@ public class OverlayView extends LinearLayout {
         }).start();
     }
 
-    // ==========================================
-    // UI BUILDER UNTUK PLAYER CARD (DESAIN MOD PREMIUM)
+// ==========================================
+    // UI BUILDER UNTUK PLAYER CARD (+ GAMBAR ICON)
     // ==========================================
     private View createPlayerCard(RoomPlayerData p) {
         Context ctx = getContext();
@@ -965,7 +965,7 @@ public class OverlayView extends LinearLayout {
         cardLp.setMargins(0, 0, 0, dp(6));
         card.setLayoutParams(cardLp);
 
-        // BAGIAN KIRI: Icon Hero & Icon Spell (Menggunakan Gambar)
+        // BAGIAN KIRI: Icon Hero & Icon Spell
         LinearLayout colLeft = new LinearLayout(ctx);
         colLeft.setOrientation(HORIZONTAL);
         colLeft.setGravity(Gravity.CENTER_VERTICAL);
@@ -976,28 +976,20 @@ public class OverlayView extends LinearLayout {
         ivHero.setLayoutParams(new LayoutParams(dp(36), dp(36)));
         ivHero.setScaleType(android.widget.ImageView.ScaleType.FIT_XY);
         
-        android.graphics.Bitmap heroBmp = null;
-        
-        // Strategi 1: Cari berdasarkan Nama Hero (Paling Akurat untuk Radar)
-        if (p.name != null) {
-            String cleanName = p.name.toLowerCase().replaceAll("[^a-z0-9]", "");
-            heroBmp = radar.getRawIcon(cleanName);
+        // FIX UNTUK BOT: Jika ID > 200, itu adalah Skin ID. Bagi 10 untuk dapat Hero ID asli!
+        int realHeroId = p.heroId;
+        if (realHeroId > 200) {
+            realHeroId = realHeroId / 10;
         }
-        
-        // Strategi 2: Cari berdasarkan Translator ID
-        if (heroBmp == null) {
-            String heroFileName = getHeroNameStr(p.heroId);
-            heroBmp = radar.getRawIcon(heroFileName);
-        }
-        
-        // Strategi 3: Cari berdasarkan ID langsung (jika file dinamai angka, misal 69.webp)
-        if (heroBmp == null) {
-            heroBmp = radar.getRawIcon(String.valueOf(p.heroId));
-        }
+
+        // Gunakan Translator ID ke Nama
+        String heroFileName = getHeroNameStr(realHeroId); 
+        android.graphics.Bitmap heroBmp = radar.getRawIcon(heroFileName);
 
         if (heroBmp != null) {
             ivHero.setImageBitmap(heroBmp);
         } else {
+            // Gambar tidak ditemukan, kasih warna abu-abu
             ivHero.setBackgroundColor(Color.DKGRAY);
         }
         
@@ -1008,16 +1000,9 @@ public class OverlayView extends LinearLayout {
         ivSpell.setLayoutParams(spellLp);
         ivSpell.setScaleType(android.widget.ImageView.ScaleType.FIT_XY);
         
-        android.graphics.Bitmap spellBmp = null;
-        
-        // Strategi 1: Cari berdasarkan Translator ID
+        // Gunakan Translator Spell ID ke Nama
         String spellFileName = getSpellNameStr(p.spellId);
-        spellBmp = radar.getRawIcon(spellFileName);
-        
-        // Strategi 2: Cari berdasarkan ID langsung (misal 20080.webp)
-        if (spellBmp == null) {
-            spellBmp = radar.getRawIcon(String.valueOf(p.spellId));
-        }
+        android.graphics.Bitmap spellBmp = radar.getRawIcon(spellFileName);
         
         if (spellBmp != null) {
             ivSpell.setImageBitmap(spellBmp);
@@ -1042,7 +1027,6 @@ public class OverlayView extends LinearLayout {
         tvName.setSingleLine(true);
 
         TextView tvUid = new TextView(ctx);
-        // Tampilkan UID dan Level
         tvUid.setText("UID: " + p.uid + " | Lv." + p.accLv);
         tvUid.setTextColor(C_SUBTEXT);
         tvUid.setTextSize(9.5f);
@@ -1066,11 +1050,10 @@ public class OverlayView extends LinearLayout {
         tvWr.setText(String.format("%.1f%% (%d M)", wr, p.matches));
         tvWr.setTextSize(10.5f);
         
-        // Pewarnaan Winrate Realistis
-        if (wr >= 65.0f && p.matches >= 20) tvWr.setTextColor(Color.parseColor("#00E676")); // Hijau terang (Pro)
-        else if (wr >= 50.0f) tvWr.setTextColor(Color.parseColor("#FFA726")); // Oranye (Normal)
-        else if (wr > 0f && p.matches >= 10) tvWr.setTextColor(Color.parseColor("#EF5350")); // Merah (Noob)
-        else tvWr.setTextColor(Color.LTGRAY); // Belum ada match / Bot
+        if (wr >= 65.0f && p.matches >= 20) tvWr.setTextColor(Color.parseColor("#00E676")); 
+        else if (wr >= 50.0f) tvWr.setTextColor(Color.parseColor("#FFA726")); 
+        else if (wr > 0f && p.matches >= 10) tvWr.setTextColor(Color.parseColor("#EF5350")); 
+        else tvWr.setTextColor(Color.LTGRAY); 
 
         colRight.addView(tvRank);
         colRight.addView(tvWr);
@@ -1144,114 +1127,45 @@ public class OverlayView extends LinearLayout {
         }
     }
 
-    // ==========================================
-    // TRANSLATOR: HERO ID -> NAMA FILE PNG/WEBP
+     // ==========================================
+    // TRANSLATOR LENGKAP: HERO ID -> NAMA FILE PNG
     // ==========================================
     private String getHeroNameStr(int heroId) {
         switch(heroId) {
-            case 1: return "miya";
-            case 2: return "balmond";
-            case 3: return "saber";
-            case 4: return "alice";
-            case 5: return "nana";
-            case 6: return "tigreal";
-            case 7: return "alucard";
-            case 8: return "karina";
-            case 9: return "akai";
-            case 10: return "franco";
-            case 11: return "bane";
-            case 12: return "bruno";
-            case 13: return "clint";
-            case 14: return "rafaela";
-            case 15: return "eudora";
-            case 16: return "zilong";
-            case 17: return "fanny";
-            case 18: return "layla";
-            case 19: return "minotaur";
-            case 20: return "lolita";
-            case 21: return "hayabusa";
-            case 22: return "freya";
-            case 23: return "gord";
-            case 24: return "natalia";
-            case 25: return "kagura";
-            case 26: return "chou";
-            case 27: return "sun";
-            case 28: return "alpha";
-            case 29: return "ruby";
-            case 30: return "yi_sun_shin";
-            case 31: return "moskov";
-            case 32: return "johnson";
-            case 33: return "cyclops";
-            case 34: return "estes";
-            case 35: return "hilda";
-            case 36: return "aurora";
-            case 37: return "lapu_lapu";
-            case 38: return "vexana";
-            case 39: return "roger";
-            case 40: return "karrie";
-            case 41: return "gatotkaca";
-            case 42: return "harley";
-            case 43: return "irithel";
-            case 44: return "grock";
-            case 45: return "argus";
-            case 46: return "odette";
-            case 47: return "lancelot";
-            case 48: return "diggie";
-            case 49: return "hylos";
-            case 50: return "zhask";
-            case 51: return "helcurt";
-            case 52: return "pharsa";
-            case 53: return "lesley";
-            case 54: return "jawhead";
-            case 55: return "angela";
-            case 56: return "gusion";
-            case 57: return "valir";
-            case 58: return "martis";
-            case 59: return "uranus";
-            case 60: return "hanabi";
-            case 61: return "chang_e";
-            case 62: return "selina";
-            case 63: return "aldous";
-            case 64: return "claude";
-            case 65: return "vale";
-            case 66: return "leomord";
-            case 67: return "lunox";
-            case 68: return "hanzo";
-            case 69: return "dyrroth";
-            case 70: return "x_borg";
-            case 71: return "ling";
-            case 72: return "wanwan";
-            case 73: return "silvanna";
-            case 74: return "cecilion";
-            case 75: return "carmilla";
-            case 76: return "atlas";
-            case 77: return "popol_kupa";
-            case 78: return "yu_zhong";
-            case 79: return "khaleed";
-            case 80: return "barats";
-            case 81: return "brody";
-            case 82: return "benedetta";
-            case 83: return "mathilda";
-            case 84: return "paquito";
-            case 85: return "beatrix";
-            case 86: return "phoveus";
-            case 87: return "zask";
-            case 88: return "aamon";
-            case 89: return "valentina";
-            case 90: return "edith";
-            case 91: return "yin";
-            case 92: return "melissa";
-            case 93: return "xavier";
-            case 94: return "julian";
-            case 95: return "fredrinn";
-            case 96: return "joy";
-            case 97: return "novaria";
-            case 98: return "arlott";
-            case 99: return "ixia";
-            case 100: return "nolan";
-            case 101: return "cici";
-            case 102: return "izxia";
-            case 103: return "chip";
+            case 1: return "miya"; case 2: return "balmond"; case 3: return "saber";
+            case 4: return "alice"; case 5: return "nana"; case 6: return "tigreal";
+            case 7: return "alucard"; case 8: return "karina"; case 9: return "akai";
+            case 10: return "franco"; case 11: return "bane"; case 12: return "bruno";
+            case 13: return "clint"; case 14: return "rafaela"; case 15: return "eudora";
+            case 16: return "zilong"; case 17: return "fanny"; case 18: return "layla";
+            case 19: return "minotaur"; case 20: return "lolita"; case 21: return "hayabusa";
+            case 22: return "freya"; case 23: return "gord"; case 24: return "natalia";
+            case 25: return "kagura"; case 26: return "chou"; case 27: return "sun";
+            case 28: return "alpha"; case 29: return "ruby"; case 30: return "yi_sun_shin"; // yisunshin di filemu yi sun-shin.png -> yisunshin
+            case 31: return "moskov"; case 32: return "johnson"; case 33: return "cyclops";
+            case 34: return "estes"; case 35: return "hilda"; case 36: return "aurora";
+            case 37: return "lapu_lapu"; case 38: return "vexana"; case 39: return "roger";
+            case 40: return "karrie"; case 41: return "gatotkaca"; case 42: return "harley";
+            case 43: return "irithel"; case 44: return "grock"; case 45: return "argus";
+            case 46: return "odette"; case 47: return "lancelot"; case 48: return "diggie";
+            case 49: return "hylos"; case 50: return "zhask"; case 51: return "helcurt";
+            case 52: return "pharsa"; case 53: return "lesley"; case 54: return "jawhead";
+            case 55: return "angela"; case 56: return "gusion"; case 57: return "valir";
+            case 58: return "martis"; case 59: return "uranus"; case 60: return "hanabi";
+            case 61: return "chang_e"; case 62: return "selena"; case 63: return "aldous";
+            case 64: return "claude"; case 65: return "vale"; case 66: return "leomord";
+            case 67: return "lunox"; case 68: return "hanzo"; case 69: return "esmeralda";
+            case 70: return "belerick"; case 71: return "kimmy"; case 72: return "thamuz";
+            case 73: return "harith"; case 74: return "minsitthar"; case 75: return "kadita";
+            case 76: return "badang"; case 77: return "khufra"; case 78: return "granger";
+            case 79: return "guinevere"; case 80: return "barats"; case 81: return "brody";
+            case 82: return "benedetta"; case 83: return "mathilda"; case 84: return "paquito";
+            case 85: return "beatrix"; case 86: return "phoveus"; case 87: return "yve";
+            case 88: return "aamon"; case 89: return "valentina"; case 90: return "edith";
+            case 91: return "yin"; case 92: return "melissa"; case 93: return "xavier";
+            case 94: return "julian"; case 95: return "fredrinn"; case 96: return "joy";
+            case 97: return "novaria"; case 98: return "arlott"; case 99: return "ixia";
+            case 100: return "nolan"; case 101: return "cici"; case 102: return "chip";
             case 125: return "suyou";
             default: return "unknown_hero"; 
         }
