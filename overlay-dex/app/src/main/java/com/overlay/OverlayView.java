@@ -75,17 +75,17 @@ public class OverlayView extends LinearLayout {
     }
 
     @SuppressWarnings("deprecation")
-    private void fetchRealScreenSize() {
-        Display display = wm.getDefaultDisplay();
-        DisplayMetrics realMetrics = new DisplayMetrics();
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1) {
-            display.getRealMetrics(realMetrics);
-        } else {
-            display.getMetrics(realMetrics);
-        }
-        realScreenW = realMetrics.widthPixels;
-        realScreenH = realMetrics.heightPixels;
+private void fetchRealScreenSize() {
+    Display display = wm.getDefaultDisplay();
+    DisplayMetrics realMetrics = new DisplayMetrics();
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1) {
+        display.getRealMetrics(realMetrics);
+    } else {
+        display.getMetrics(realMetrics);
     }
+    realScreenW = realMetrics.widthPixels;
+    realScreenH = realMetrics.heightPixels;
+}
 
     private void buildPill(Context ctx) {
         tvPill = new TextView(ctx);
@@ -845,12 +845,12 @@ public class OverlayView extends LinearLayout {
 
         switch (e.getAction()) {
             case MotionEvent.ACTION_DOWN:
-                tx = e.getRawX(); 
+                tx = e.getRawX();
                 ty = e.getRawY();
-                ix = lp.x; 
+                ix = lp.x;
                 iy = lp.y;
                 dragging = false;
-                fetchRealScreenSize();  // refresh ukuran layar
+                fetchRealScreenSize(); // Refresh ukuran layar setiap mulai drag
                 return true;
 
             case MotionEvent.ACTION_MOVE:
@@ -859,26 +859,26 @@ public class OverlayView extends LinearLayout {
                 int dx = (int)(e.getRawX() - tx);
                 int dy = (int)(e.getRawY() - ty);
 
-                if (Math.abs(dx) > 8 || Math.abs(dy) > 8) {
+                if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
                     dragging = true;
 
                     float scale = prefs.getFloat("ui_scale", 1.0f);
                     int viewW = getWidth();
                     int viewH = getHeight();
 
-                    // Perbaikan perhitungan batas
-                    int scaledW = (int) (viewW * scale);
-                    int scaledH = (int) (viewH * scale);
+                    // PERBAIKAN UTAMA: Hitung ukuran setelah scale dengan benar
+                    int scaledW = Math.max(50, (int) (viewW * scale));   // minimal 50px
+                    int scaledH = Math.max(50, (int) (viewH * scale));
 
-                    // Allow sticking to edge with small margin
+                    // Batas maksimal dengan margin kecil agar bisa nempel ke tepi
                     int maxX = realScreenW - scaledW;
                     int maxY = realScreenH - scaledH;
 
                     lp.x = Math.max(0, Math.min(ix + dx, maxX));
                     lp.y = Math.max(0, Math.min(iy + dy, maxY));
 
-                    try { 
-                        wm.updateViewLayout(OverlayView.this, lp); 
+                    try {
+                        wm.updateViewLayout(OverlayView.this, lp);
                     } catch (Exception ignored) {}
                 }
                 return true;
