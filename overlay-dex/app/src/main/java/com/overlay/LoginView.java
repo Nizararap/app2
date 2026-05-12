@@ -22,11 +22,11 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 public class LoginView extends LinearLayout {
-    private static final int C_BG = Color.parseColor("#0D0D12");
-    private static final int C_ACCENT = Color.parseColor("#00D4FF");
-    private static final int C_TEXT = Color.parseColor("#EEEEF5");
-    private static final int C_SUBTEXT = Color.parseColor("#66667A");
-    private static final int C_CARD = Color.parseColor("#16161E");
+    private static final int C_BG = Color.argb(235, 18, 18, 28);
+    private static final int C_ACCENT = Color.parseColor("#7C4DFF");
+    private static final int C_TEXT = Color.parseColor("#FFFFFF");
+    private static final int C_SUBTEXT = Color.parseColor("#A0A0B8");
+    private static final int C_CARD = Color.parseColor("#252538");
 
     private final WindowManager wm;
     private final WindowManager.LayoutParams lp;
@@ -101,8 +101,8 @@ public class LoginView extends LinearLayout {
         
         GradientDrawable gd = new GradientDrawable();
         gd.setColor(C_BG);
-        gd.setCornerRadius(dp(15));
-        gd.setStroke(dp(1), Color.argb(100, 0, 212, 255));
+        gd.setCornerRadius(dp(24));
+        gd.setStroke(dp(1), Color.argb(80, 124, 77, 255));
         loginCard.setBackground(gd);
 
         LayoutParams cardLp = new LayoutParams(dp(280), LayoutParams.WRAP_CONTENT);
@@ -115,10 +115,11 @@ public class LoginView extends LinearLayout {
         header.setPadding(0, 0, 0, dp(15));
         
         TextView title = new TextView(ctx);
-        title.setText("VIP LOGIN");
-        title.setTextColor(C_ACCENT);
-        title.setTextSize(18f);
-        title.setTypeface(null, Typeface.BOLD);
+        title.setText("VIP ACCESS");
+        title.setTextColor(C_TEXT);
+        title.setTextSize(16f);
+        title.setLetterSpacing(0.05f);
+        title.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
         title.setLayoutParams(new LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f));
         header.addView(title);
         
@@ -216,8 +217,10 @@ public class LoginView extends LinearLayout {
         
         GradientDrawable btnBg = new GradientDrawable();
         btnBg.setColor(C_ACCENT);
-        btnBg.setCornerRadius(dp(8));
+        btnBg.setCornerRadius(dp(14));
         btnLogin.setBackground(btnBg);
+        btnLogin.setTextColor(Color.WHITE);
+        btnLogin.setLetterSpacing(0.1f);
         
         btnLogin.setOnClickListener(v -> attemptLogin());
         loginCard.addView(btnLogin);

@@ -24,16 +24,17 @@ import android.widget.TextView;
 
 public class OverlayView extends LinearLayout {
 
-    private static final int C_BG      = Color.parseColor("#0D0D12");
-    private static final int C_CARD    = Color.parseColor("#16161E");
-    private static final int C_HEADER  = Color.parseColor("#0A0A10");
-    private static final int C_ACCENT  = Color.parseColor("#00D4FF");
-    private static final int C_GREEN   = Color.parseColor("#00E676");
-    private static final int C_TEXT    = Color.parseColor("#EEEEF5");
-    private static final int C_SUBTEXT = Color.parseColor("#66667A");
-    private static final int C_DIVIDER = Color.parseColor("#1E1E28");
-    private static final int C_BTN_BLU = Color.parseColor("#1565C0");
-    private static final int C_BTN_DRK = Color.parseColor("#1E1E28");
+    // Modern Glassmorphism Palette
+    private static final int C_BG      = Color.argb(235, 18, 18, 28); // Deeper, semi-transparent
+    private static final int C_CARD    = Color.parseColor("#252538");
+    private static final int C_HEADER  = Color.argb(255, 13, 13, 20);
+    private static final int C_ACCENT  = Color.parseColor("#7C4DFF"); // Vibrant Purple
+    private static final int C_GREEN   = Color.parseColor("#00F5A0"); // Neon Mint
+    private static final int C_TEXT    = Color.parseColor("#FFFFFF");
+    private static final int C_SUBTEXT = Color.parseColor("#A0A0B8");
+    private static final int C_DIVIDER = Color.parseColor("#2D2D3F");
+    private static final int C_BTN_BLU = Color.parseColor("#6200EE");
+    private static final int C_BTN_DRK = Color.parseColor("#2D2D3F");
 
     private final WindowManager wm;
     private final WindowManager.LayoutParams lp;
@@ -88,16 +89,22 @@ public class OverlayView extends LinearLayout {
 
     private void buildPill(Context ctx) {
         tvPill = new TextView(ctx);
-        tvPill.setText("⚡");
-        tvPill.setTextColor(C_ACCENT);
-        tvPill.setTextSize(16f);
+        tvPill.setText("󱐋"); // Lightning bolt icon
+        if (tvPill.getText().length() > 1) tvPill.setText("M");
+        tvPill.setTextColor(Color.WHITE);
+        tvPill.setTextSize(18f);
+        tvPill.setTypeface(null, Typeface.BOLD);
         tvPill.setGravity(Gravity.CENTER);
-        tvPill.setPadding(dp(14), dp(12), dp(14), dp(12));
+        tvPill.setPadding(dp(16), dp(16), dp(16), dp(16));
+        
         GradientDrawable bg = new GradientDrawable();
-        bg.setColor(C_BG);
-        bg.setCornerRadius(dp(50));
-        bg.setStroke(dp(1), Color.argb(60, 0, 212, 255));
+        bg.setShape(GradientDrawable.OVAL);
+        bg.setColors(new int[]{C_ACCENT, Color.parseColor("#9C27B0")}); // Gradient
+        bg.setOrientation(GradientDrawable.Orientation.TL_BR);
+        bg.setStroke(dp(2), Color.argb(100, 255, 255, 255));
+        
         tvPill.setBackground(bg);
+        tvPill.setElevation(dp(8));
         tvPill.setOnTouchListener(dragL);
         addView(tvPill);
     }
@@ -108,8 +115,8 @@ public class OverlayView extends LinearLayout {
         panel.setMinimumWidth(dp(310));
         GradientDrawable bg = new GradientDrawable();
         bg.setColor(C_BG);
-        bg.setCornerRadius(dp(14));
-        bg.setStroke(1, Color.argb(40, 0, 212, 255));
+        bg.setCornerRadius(dp(22));
+        bg.setStroke(dp(1), Color.argb(60, 124, 77, 255));
         panel.setBackground(bg);
         panel.addView(buildHeader(ctx));
         panel.addView(buildTabs(ctx));
@@ -120,16 +127,19 @@ public class OverlayView extends LinearLayout {
 
     private View buildHeader(Context ctx) {
         LinearLayout h = new LinearLayout(ctx);
-        h.setBackgroundColor(C_HEADER);
-        h.setPadding(dp(14), dp(11), dp(10), dp(11));
+        GradientDrawable hbg = new GradientDrawable();
+        hbg.setColor(C_HEADER);
+        hbg.setCornerRadii(new float[]{dp(22), dp(22), dp(22), dp(22), 0, 0, 0, 0});
+        h.setBackground(hbg);
+        h.setPadding(dp(18), dp(16), dp(14), dp(16));
         h.setGravity(Gravity.CENTER_VERTICAL);
 
         View bar = new View(ctx);
-        LayoutParams blp = new LayoutParams(dp(3), dp(18));
-        blp.setMargins(0, 0, dp(8), 0);
+        LayoutParams blp = new LayoutParams(dp(4), dp(20));
+        blp.setMargins(0, 0, dp(12), 0);
         bar.setLayoutParams(blp);
         GradientDrawable bbg = new GradientDrawable();
-        bbg.setColor(C_ACCENT); bbg.setCornerRadius(dp(4));
+        bbg.setColor(C_ACCENT); bbg.setCornerRadius(dp(6));
         bar.setBackground(bbg);
         h.addView(bar);
 
@@ -137,20 +147,27 @@ public class OverlayView extends LinearLayout {
         col.setOrientation(VERTICAL);
         col.setLayoutParams(new LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f));
         TextView t1 = new TextView(ctx);
-        t1.setText("MLBB Radar Premium");
-        t1.setTextColor(C_TEXT); t1.setTextSize(13f); t1.setTypeface(null, Typeface.BOLD);
+        t1.setText("MODERN OVERLAY");
+        t1.setLetterSpacing(0.05f);
+        t1.setTextColor(C_TEXT); t1.setTextSize(14f); t1.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
         col.addView(t1);
         
         long rem = authManager.getRemainingTime();
         String timeStr = formatTime(rem);
         
         TextView t2 = new TextView(ctx);
-        t2.setText("VIP Expire: " + timeStr);
+        t2.setText("Active Plan: " + timeStr);
         t2.setTextColor(C_ACCENT); t2.setTextSize(10f);
+        t2.setAlpha(0.9f);
         col.addView(t2);
         h.addView(col);
 
-        TextView minBtn = pillBtn(ctx, "─", C_SUBTEXT, C_BTN_DRK);
+        TextView minBtn = new TextView(ctx);
+        minBtn.setText("󰖭"); // Material Icon or simple char
+        if (minBtn.getText().length() > 1) minBtn.setText("—");
+        minBtn.setTextColor(C_TEXT);
+        minBtn.setTextSize(16f);
+        minBtn.setPadding(dp(8), dp(4), dp(8), dp(4));
         minBtn.setOnClickListener(v -> showCollapsed());
         h.addView(minBtn);
         h.setOnTouchListener(dragL);
@@ -163,17 +180,20 @@ public class OverlayView extends LinearLayout {
         hsv.setBackgroundColor(C_HEADER);
         LinearLayout bar = new LinearLayout(ctx);
         bar.setOrientation(HORIZONTAL);
-        bar.setPadding(dp(8), dp(6), dp(8), dp(6));
-        String[] labels = {"Dashboard", "Radar Map", "Combat & Aim", "Room Info"};
+        bar.setPadding(dp(12), dp(2), dp(12), dp(10));
+        String[] labels = {"DASHBOARD", "RADAR", "COMBAT", "ROOM"};
         tabBtns = new TextView[labels.length];
         for (int i = 0; i < labels.length; i++) {
             final int idx = i;
             tabBtns[i] = new TextView(ctx);
             tabBtns[i].setText(labels[i]);
-            tabBtns[i].setTextSize(11.5f); tabBtns[i].setTypeface(null, Typeface.BOLD);
-            tabBtns[i].setPadding(dp(14), dp(6), dp(14), dp(6));
+            tabBtns[i].setTextSize(10f); 
+            tabBtns[i].setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
+            tabBtns[i].setLetterSpacing(0.08f);
+            tabBtns[i].setPadding(dp(16), dp(8), dp(16), dp(8));
+            tabBtns[i].setGravity(Gravity.CENTER);
             LayoutParams tlp = new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
-            tlp.setMargins(0, 0, dp(4), 0);
+            tlp.setMargins(0, 0, dp(6), 0);
             tabBtns[i].setLayoutParams(tlp);
             tabBtns[i].setOnClickListener(v -> switchTab(idx));
             bar.addView(tabBtns[i]);
@@ -187,66 +207,61 @@ public class OverlayView extends LinearLayout {
             boolean a = i == idx;
             tabBtns[i].setTextColor(a ? C_ACCENT : C_SUBTEXT);
             GradientDrawable tbg = new GradientDrawable();
-            tbg.setColor(a ? Color.argb(30, 0, 212, 255) : Color.TRANSPARENT);
-            tbg.setCornerRadius(dp(20));
-            if (a) tbg.setStroke(1, Color.argb(80, 0, 212, 255));
+            tbg.setColor(a ? Color.argb(25, 124, 77, 255) : Color.argb(10, 255, 255, 255));
+            tbg.setCornerRadius(dp(12));
+            if (a) tbg.setStroke(dp(1), Color.argb(120, 124, 77, 255));
+            else tbg.setStroke(dp(1), Color.argb(20, 255, 255, 255));
             tabBtns[i].setBackground(tbg);
         }
         if (tabDash   != null) tabDash.setVisibility(idx == 0 ? VISIBLE : GONE);
     if (tabRad    != null) tabRad.setVisibility(idx == 1 ? VISIBLE : GONE);
     if (tabCombat != null) tabCombat.setVisibility(idx == 2 ? VISIBLE : GONE);
     if (tabRoom   != null) tabRoom.setVisibility(idx == 3 ? VISIBLE : GONE);
-       // ✅ Biar panel langsung resize
-    panel.requestLayout();
     }
 
     private View buildContent(Context ctx) {
-    scrollView = new ScrollView(ctx);
-    scrollView.setFillViewport(false);
+        scrollView = new ScrollView(ctx);
+        scrollView.setFillViewport(false);
 
-    FrameLayout frame = new FrameLayout(ctx);
-    frame.setPadding(dp(10), dp(8), dp(10), dp(10));
+        FrameLayout frame = new FrameLayout(ctx);
+        frame.setPadding(dp(10), dp(8), dp(10), dp(10));
 
-    tabDash   = buildDash(ctx);
-    tabRad    = buildRadar(ctx);
-    tabCombat = buildCombat(ctx);
-    tabRoom   = buildRoomInfo(ctx);
+        tabDash   = buildDash(ctx);
+        tabRad    = buildRadar(ctx);
+        tabCombat = buildCombat(ctx);
+        tabRoom   = buildRoomInfo(ctx);
 
-    frame.addView(tabDash);
-    frame.addView(tabRad);
-    frame.addView(tabCombat);
-    frame.addView(tabRoom);
+        frame.addView(tabDash);
+        frame.addView(tabRad);
+        frame.addView(tabCombat);
+        scrollView.addView(frame);
+        frame.addView(tabRoom); // TAMBAHAN
 
-    // ✅ PERBAIKAN: Tambahkan LayoutParams WRAP_CONTENT
-    scrollView.addView(frame, new FrameLayout.LayoutParams(
-            FrameLayout.LayoutParams.WRAP_CONTENT,
-            FrameLayout.LayoutParams.WRAP_CONTENT));
+        scrollView.setLayoutParams(new LayoutParams(LayoutParams.MATCH_PARENT,
+                LayoutParams.WRAP_CONTENT));
 
-    scrollView.setLayoutParams(new LayoutParams(LayoutParams.MATCH_PARENT,
-            LayoutParams.WRAP_CONTENT));
+        int statusBarH = 0;
+        try {
+            int resId = ctx.getResources().getIdentifier("status_bar_height", "dimen", "android");
+            if (resId > 0) statusBarH = ctx.getResources().getDimensionPixelSize(resId);
+        } catch (Exception ignored) {}
+        final int maxScrollH = Math.max(dp(80), realScreenH - statusBarH - dp(100));
 
-    int statusBarH = 0;
-    try {
-        int resId = ctx.getResources().getIdentifier("status_bar_height", "dimen", "android");
-        if (resId > 0) statusBarH = ctx.getResources().getDimensionPixelSize(resId);
-    } catch (Exception ignored) {}
-    final int maxScrollH = Math.max(dp(80), realScreenH - statusBarH - dp(100));
-
-    scrollView.getViewTreeObserver().addOnGlobalLayoutListener(
-        new android.view.ViewTreeObserver.OnGlobalLayoutListener() {
-            @Override
-            public void onGlobalLayout() {
-                scrollView.getViewTreeObserver().removeOnGlobalLayoutListener(this);
-                if (scrollView.getHeight() > maxScrollH) {
-                    scrollView.setLayoutParams(
-                        new LayoutParams(LayoutParams.MATCH_PARENT, maxScrollH));
+        scrollView.getViewTreeObserver().addOnGlobalLayoutListener(
+            new android.view.ViewTreeObserver.OnGlobalLayoutListener() {
+                @Override
+                public void onGlobalLayout() {
+                    scrollView.getViewTreeObserver().removeOnGlobalLayoutListener(this);
+                    if (scrollView.getHeight() > maxScrollH) {
+                        scrollView.setLayoutParams(
+                            new LayoutParams(LayoutParams.MATCH_PARENT, maxScrollH));
+                    }
                 }
             }
-        }
-    );
+        );
 
-    return scrollView;
-}
+        return scrollView;
+    }
 
     // ==================== DASHBOARD ====================
     private LinearLayout buildDash(Context ctx) {
@@ -475,26 +490,29 @@ public class OverlayView extends LinearLayout {
 
     private View card(Context ctx, CardB cb) {
         LinearLayout c = new LinearLayout(ctx); c.setOrientation(VERTICAL);
-        c.setPadding(dp(12), dp(10), dp(12), dp(12));
+        c.setPadding(dp(16), dp(14), dp(16), dp(14));
         GradientDrawable bg = new GradientDrawable();
-        bg.setColor(C_CARD); bg.setCornerRadius(dp(10));
+        bg.setColor(C_CARD); 
+        bg.setCornerRadius(dp(16));
+        bg.setStroke(dp(1), Color.argb(15, 255, 255, 255));
         c.setBackground(bg); cb.b(c);
         LayoutParams clp = new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
-        clp.setMargins(0, 0, 0, dp(6));
+        clp.setMargins(0, 0, 0, dp(12));
         c.setLayoutParams(clp);
         return c;
     }
 
     private View secTitle(Context ctx, String title) {
         LinearLayout r = new LinearLayout(ctx); r.setGravity(Gravity.CENTER_VERTICAL);
-        r.setPadding(0, 0, 0, dp(8));
+        r.setPadding(0, dp(4), 0, dp(12));
         View bar = new View(ctx);
-        LayoutParams blp = new LayoutParams(dp(3), dp(12)); blp.setMargins(0,0,dp(7),0);
+        LayoutParams blp = new LayoutParams(dp(4), dp(14)); blp.setMargins(0,0,dp(8),0);
         bar.setLayoutParams(blp);
-        GradientDrawable bbg = new GradientDrawable(); bbg.setColor(C_ACCENT); bbg.setCornerRadius(dp(4));
+        GradientDrawable bbg = new GradientDrawable(); bbg.setColor(C_ACCENT); bbg.setCornerRadius(dp(100));
         bar.setBackground(bbg); r.addView(bar);
-        TextView tv = new TextView(ctx); tv.setText(title); tv.setTextColor(C_ACCENT);
-        tv.setTextSize(11f); tv.setTypeface(null, Typeface.BOLD); tv.setLetterSpacing(0.08f);
+        TextView tv = new TextView(ctx); tv.setText(title.toUpperCase()); tv.setTextColor(C_ACCENT);
+        tv.setTextSize(10f); tv.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD)); tv.setLetterSpacing(0.12f);
+        tv.setAlpha(0.9f);
         r.addView(tv);
         return r;
     }
@@ -582,17 +600,25 @@ public class OverlayView extends LinearLayout {
         final boolean[] on = {init};
         LinearLayout track = new LinearLayout(ctx);
         track.setGravity(init ? Gravity.END|Gravity.CENTER_VERTICAL : Gravity.START|Gravity.CENTER_VERTICAL);
-        track.setPadding(dp(3), dp(3), dp(3), dp(3));
-        track.setLayoutParams(new LayoutParams(dp(42), dp(24)));
+        track.setPadding(dp(4), dp(4), dp(4), dp(4));
+        track.setLayoutParams(new LayoutParams(dp(44), dp(24)));
+        
         final GradientDrawable tbg = new GradientDrawable();
-        tbg.setColor(init ? C_GREEN : C_SUBTEXT); tbg.setCornerRadius(dp(12));
+        tbg.setColor(init ? C_ACCENT : Color.argb(40, 160, 160, 184)); 
+        tbg.setCornerRadius(dp(100));
         track.setBackground(tbg);
-        View thumb = new View(ctx); thumb.setLayoutParams(new LayoutParams(dp(18), dp(18)));
-        GradientDrawable thbg = new GradientDrawable(); thbg.setShape(GradientDrawable.OVAL);
-        thbg.setColor(Color.WHITE); thumb.setBackground(thbg); track.addView(thumb);
+        
+        View thumb = new View(ctx); 
+        thumb.setLayoutParams(new LayoutParams(dp(16), dp(16)));
+        GradientDrawable thbg = new GradientDrawable(); 
+        thbg.setShape(GradientDrawable.OVAL);
+        thbg.setColor(Color.WHITE); 
+        thumb.setBackground(thbg); 
+        track.addView(thumb);
+        
         track.setOnClickListener(v -> {
             on[0] = !on[0];
-            tbg.setColor(on[0] ? C_GREEN : C_SUBTEXT);
+            tbg.setColor(on[0] ? C_ACCENT : Color.argb(40, 160, 160, 184));
             track.setGravity(on[0] ? Gravity.END|Gravity.CENTER_VERTICAL
                                    : Gravity.START|Gravity.CENTER_VERTICAL);
             cb.t(on[0]);
@@ -610,8 +636,15 @@ public class OverlayView extends LinearLayout {
         tv.setTextColor(C_ACCENT); tv.setTextSize(11f); tv.setTypeface(null, Typeface.BOLD); lr.addView(tv);
         c.addView(lr);
         SeekBar sb = new SeekBar(ctx); sb.setMax(100);
-        sb.setProgress((int)(((cur-min)/(max-min))*100)); sb.setPadding(0, dp(4), 0, 0);
+        sb.setProgress((int)(((cur-min)/(max-min))*100)); 
+        sb.setPadding(dp(4), dp(8), dp(4), dp(8));
         
+        // Modernizing SeekBar appearance (if possible via code)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            sb.setProgressTintList(android.content.res.ColorStateList.valueOf(C_ACCENT));
+            sb.setThumbTintList(android.content.res.ColorStateList.valueOf(C_ACCENT));
+        }
+
         sb.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override public void onProgressChanged(SeekBar s, int p, boolean u) {
                 // Hanya update teks UI saat digeser, JANGAN render ulang radar / simpan data disini

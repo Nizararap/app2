@@ -124,19 +124,20 @@ public class RadarView extends View {
 
     private void initPaints() {
         borderPaint = new Paint();
-        borderPaint.setColor(Color.argb(200, 255, 255, 255));
+        borderPaint.setColor(Color.argb(120, 124, 77, 255)); // Semi-transparent Purple
         borderPaint.setStyle(Paint.Style.STROKE);
-        borderPaint.setStrokeWidth(3f);
+        borderPaint.setStrokeWidth(2f); // Thinner border
         borderPaint.setAntiAlias(true);
 
         enemyPaint = new Paint();
-        enemyPaint.setColor(Color.argb(180, 200, 0, 0));
+        enemyPaint.setColor(Color.argb(200, 255, 45, 85)); // Modern Red/Pink
         enemyPaint.setStyle(Paint.Style.FILL);
         enemyPaint.setAntiAlias(true);
 
         textPaint = new Paint();
         textPaint.setColor(Color.WHITE);
-        textPaint.setTextSize(22f);
+        textPaint.setTextSize(20f);
+        textPaint.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
         textPaint.setTextAlign(Paint.Align.CENTER);
         textPaint.setAntiAlias(true);
     }
