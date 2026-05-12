@@ -92,19 +92,19 @@ public class OverlayView extends LinearLayout {
         tvPill.setText("󱐋"); // Lightning bolt icon
         if (tvPill.getText().length() > 1) tvPill.setText("M");
         tvPill.setTextColor(Color.WHITE);
-        tvPill.setTextSize(18f);
+        tvPill.setTextSize(14f); // Smaller font
         tvPill.setTypeface(null, Typeface.BOLD);
         tvPill.setGravity(Gravity.CENTER);
-        tvPill.setPadding(dp(16), dp(16), dp(16), dp(16));
+        tvPill.setPadding(dp(10), dp(10), dp(10), dp(10)); // Smaller padding
         
         GradientDrawable bg = new GradientDrawable();
         bg.setShape(GradientDrawable.OVAL);
-        bg.setColors(new int[]{C_ACCENT, Color.parseColor("#9C27B0")}); // Gradient
+        bg.setColors(new int[]{C_ACCENT, Color.parseColor("#9C27B0")}); 
         bg.setOrientation(GradientDrawable.Orientation.TL_BR);
-        bg.setStroke(dp(2), Color.argb(100, 255, 255, 255));
+        bg.setStroke(dp(1), Color.argb(150, 255, 255, 255)); // Thinner border
         
         tvPill.setBackground(bg);
-        tvPill.setElevation(dp(8));
+        tvPill.setElevation(dp(4)); // Lower elevation
         tvPill.setOnTouchListener(dragL);
         addView(tvPill);
     }
@@ -231,11 +231,20 @@ public class OverlayView extends LinearLayout {
         tabCombat = buildCombat(ctx);
         tabRoom   = buildRoomInfo(ctx);
 
+        // Optimasi Lebar: Dashboard & Radar dibuat lebih kompak (max width)
+        int compactWidth = dp(280);
+        tabDash.setLayoutParams(new FrameLayout.LayoutParams(compactWidth, LayoutParams.WRAP_CONTENT, Gravity.CENTER_HORIZONTAL));
+        tabRad.setLayoutParams(new FrameLayout.LayoutParams(compactWidth, LayoutParams.WRAP_CONTENT, Gravity.CENTER_HORIZONTAL));
+        
+        // Combat & Room Info tetap fleksibel / lebar
+        tabCombat.setLayoutParams(new FrameLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
+        tabRoom.setLayoutParams(new FrameLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
+
         frame.addView(tabDash);
         frame.addView(tabRad);
         frame.addView(tabCombat);
+        frame.addView(tabRoom);
         scrollView.addView(frame);
-        frame.addView(tabRoom); // TAMBAHAN
 
         scrollView.setLayoutParams(new LayoutParams(LayoutParams.MATCH_PARENT,
                 LayoutParams.WRAP_CONTENT));
@@ -627,40 +636,83 @@ public class OverlayView extends LinearLayout {
     }
 
     private View slider(Context ctx, String title, String key, float min, float max, float def) {
-        LinearLayout c = new LinearLayout(ctx); c.setOrientation(VERTICAL); c.setPadding(0, dp(4), 0, dp(4));
+        LinearLayout c = new LinearLayout(ctx); c.setOrientation(VERTICAL); c.setPadding(0, dp(6), 0, dp(6));
+        
         LinearLayout lr = new LinearLayout(ctx); lr.setGravity(Gravity.CENTER_VERTICAL);
         TextView tt = new TextView(ctx); tt.setText(title); tt.setTextColor(C_SUBTEXT); tt.setTextSize(11f);
         tt.setLayoutParams(new LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f)); lr.addView(tt);
+        
         float cur = prefs.getFloat(key, def);
         TextView tv = new TextView(ctx); tv.setText(String.format("%.0f", cur));
         tv.setTextColor(C_ACCENT); tv.setTextSize(11f); tv.setTypeface(null, Typeface.BOLD); lr.addView(tv);
         c.addView(lr);
+
+        LinearLayout controls = new LinearLayout(ctx);
+        controls.setGravity(Gravity.CENTER_VERTICAL);
+        controls.setPadding(0, dp(4), 0, 0);
+
         SeekBar sb = new SeekBar(ctx); sb.setMax(100);
         sb.setProgress((int)(((cur-min)/(max-min))*100)); 
-        sb.setPadding(dp(4), dp(8), dp(4), dp(8));
+        sb.setLayoutParams(new LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f));
         
-        // Modernizing SeekBar appearance (if possible via code)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             sb.setProgressTintList(android.content.res.ColorStateList.valueOf(C_ACCENT));
             sb.setThumbTintList(android.content.res.ColorStateList.valueOf(C_ACCENT));
         }
 
+        // Helper to update value
+        java.util.function.Consumer<Float> updateVal = (v) -> {
+            float finalV = Math.max(min, Math.min(max, v));
+            tv.setText(String.format("%.0f", finalV));
+            sb.setProgress((int)(((finalV-min)/(max-min))*100));
+            prefs.edit().putFloat(key, finalV).apply();
+            sendConfigToCpp(prefs);
+            radar.invalidate();
+        };
+
+        TextView btnMinus = new TextView(ctx);
+        btnMinus.setText("−"); btnMinus.setTextColor(C_TEXT); btnMinus.setTextSize(16f);
+        btnMinus.setPadding(dp(10), dp(5), dp(10), dp(5));
+        btnMinus.setBackground(pillBtnBg(C_BTN_DRK));
+        btnMinus.setOnClickListener(v -> {
+            float val = prefs.getFloat(key, def) - 1;
+            updateVal.accept(val);
+        });
+
+        TextView btnPlus = new TextView(ctx);
+        btnPlus.setText("+"); btnPlus.setTextColor(C_TEXT); btnPlus.setTextSize(16f);
+        btnPlus.setPadding(dp(10), dp(5), dp(10), dp(5));
+        btnPlus.setBackground(pillBtnBg(C_BTN_DRK));
+        btnPlus.setOnClickListener(v -> {
+            float val = prefs.getFloat(key, def) + 1;
+            updateVal.accept(val);
+        });
+
         sb.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override public void onProgressChanged(SeekBar s, int p, boolean u) {
-                // Hanya update teks UI saat digeser, JANGAN render ulang radar / simpan data disini
+                if (!u) return;
                 float v = min+((max-min)*(p/100f));
-                tv.setText(String.format("%.0f", v)); 
-            }
-            @Override public void onStartTrackingTouch(SeekBar s) {}
-            @Override public void onStopTrackingTouch(SeekBar s) {
-                // Eksekusi berat hanya saat jari dilepas
-                float v = min+((max-min)*(s.getProgress()/100f)); 
+                tv.setText(String.format("%.0f", v));
                 prefs.edit().putFloat(key, v).apply();
                 sendConfigToCpp(prefs);
                 radar.invalidate();
             }
+            @Override public void onStartTrackingTouch(SeekBar s) {}
+            @Override public void onStopTrackingTouch(SeekBar s) {}
         });
-        c.addView(sb); return c;
+
+        controls.addView(btnMinus);
+        controls.addView(sb);
+        controls.addView(btnPlus);
+        c.addView(controls); 
+        return c;
+    }
+
+    private GradientDrawable pillBtnBg(int color) {
+        GradientDrawable gd = new GradientDrawable();
+        gd.setColor(color);
+        gd.setCornerRadius(dp(8));
+        return gd;
     }
 
     private View radioRow(Context ctx, String key, String[] opts) {
@@ -761,8 +813,14 @@ public class OverlayView extends LinearLayout {
                         dragging = true;
                         int viewW = getWidth();
                         int viewH = getHeight();
-                        int maxX = (viewW > 0) ? realScreenW - viewW : realScreenW - dp(310);
-                        int maxY = (viewH > 0) ? realScreenH - viewH : realScreenH - dp(200);
+                        float scale = prefs.getFloat("ui_scale", 1.0f);
+                        int scaledW = (int)(viewW * scale);
+                        int scaledH = (int)(viewH * scale);
+                        
+                        // Fix: Using 0 to allow moving to very edge, and properly calculate maxX/Y
+                        int maxX = realScreenW - (v == tvPill ? viewW : scaledW);
+                        int maxY = realScreenH - (v == tvPill ? viewH : scaledH);
+                        
                         lp.x = Math.max(0, Math.min(ix + dx, maxX));
                         lp.y = Math.max(0, Math.min(iy + dy, maxY));
                         wm.updateViewLayout(OverlayView.this, lp);
