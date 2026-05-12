@@ -55,6 +55,7 @@ public class OverlayView extends LinearLayout {
     private TextView tvPill;
     private TextView[] tabBtns;
     private ScrollView scrollView;
+    private LinearLayout tabRoom;
 
     public OverlayView(Context ctx, WindowManager wm, WindowManager.LayoutParams lp, RadarView radar) {
         super(ctx);
@@ -163,7 +164,7 @@ public class OverlayView extends LinearLayout {
         LinearLayout bar = new LinearLayout(ctx);
         bar.setOrientation(HORIZONTAL);
         bar.setPadding(dp(8), dp(6), dp(8), dp(6));
-        String[] labels = {"Dashboard", "Radar Map", "Combat & Aim"};
+        String[] labels = {"Dashboard", "Radar Map", "Combat & Aim", "Room Info"};
         tabBtns = new TextView[labels.length];
         for (int i = 0; i < labels.length; i++) {
             final int idx = i;
@@ -192,8 +193,9 @@ public class OverlayView extends LinearLayout {
             tabBtns[i].setBackground(tbg);
         }
         if (tabDash   != null) tabDash.setVisibility(idx == 0 ? VISIBLE : GONE);
-        if (tabRad    != null) tabRad.setVisibility(idx == 1 ? VISIBLE : GONE);
-        if (tabCombat != null) tabCombat.setVisibility(idx == 2 ? VISIBLE : GONE);
+    if (tabRad    != null) tabRad.setVisibility(idx == 1 ? VISIBLE : GONE);
+    if (tabCombat != null) tabCombat.setVisibility(idx == 2 ? VISIBLE : GONE);
+    if (tabRoom   != null) tabRoom.setVisibility(idx == 3 ? VISIBLE : GONE);
     }
 
     private View buildContent(Context ctx) {
@@ -206,11 +208,13 @@ public class OverlayView extends LinearLayout {
         tabDash   = buildDash(ctx);
         tabRad    = buildRadar(ctx);
         tabCombat = buildCombat(ctx);
+        tabRoom   = buildRoomInfo(ctx);
 
         frame.addView(tabDash);
         frame.addView(tabRad);
         frame.addView(tabCombat);
         scrollView.addView(frame);
+        frame.addView(tabRoom); // TAMBAHAN
 
         scrollView.setLayoutParams(new LayoutParams(LayoutParams.MATCH_PARENT,
                 LayoutParams.WRAP_CONTENT));
@@ -809,6 +813,102 @@ public class OverlayView extends LinearLayout {
                 type, WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE, PixelFormat.TRANSLUCENT
         );
         try { wm.addView(dimBg, lp); } catch (Exception ignored) {}
+    }
+    
+    private LinearLayout roomTableContainer;
+    private boolean isRoomSocketRunning = false;
+
+    private LinearLayout buildRoomInfo(Context ctx) {
+        LinearLayout t = new LinearLayout(ctx); 
+        t.setOrientation(VERTICAL);
+
+        t.addView(card(ctx, l -> {
+            l.addView(secTitle(ctx, "DRAFT PICK / LOADING SCREEN"));
+            roomTableContainer = new LinearLayout(ctx);
+            roomTableContainer.setOrientation(VERTICAL);
+            l.addView(roomTableContainer);
+        }));
+
+        if (!isRoomSocketRunning) {
+            isRoomSocketRunning = true;
+            startRoomSocketThread();
+        }
+
+        return t;
+    }
+
+    private void startRoomSocketThread() {
+        new Thread(() -> {
+            while (isRoomSocketRunning) {
+                android.net.LocalSocket socket = null;
+                java.io.DataInputStream dis = null;
+                try {
+                    socket = new android.net.LocalSocket();
+                    socket.connect(new android.net.LocalSocketAddress("mlbb_room_socket", android.net.LocalSocketAddress.Namespace.ABSTRACT));
+                    dis = new java.io.DataInputStream(socket.getInputStream());
+
+                    byte[] countBuf = new byte[4];
+                    // 64 Bytes sesuai struct di C++: camp(4) + uid(4) + zoneId(4) + heroId(4) + rankLevel(4) + mythPoint(4) + totalMatches(4) + totalWins(4) + accLevel(4) + name(32) = 68 Bytes. Oh tunggu: 9*4 = 36 + 32 = 68 byte!
+                    byte[] packetBuf = new byte[68];
+
+                    while (isRoomSocketRunning) {
+                        dis.readFully(countBuf);
+                        int count = java.nio.ByteBuffer.wrap(countBuf).order(java.nio.ByteOrder.LITTLE_ENDIAN).getInt();
+
+                        if (count > 10 || count < 0) count = 0;
+
+                        final StringBuilder sbUi = new StringBuilder();
+                        
+                        for (int i = 0; i < count; i++) {
+                            dis.readFully(packetBuf);
+                            java.nio.ByteBuffer bb = java.nio.ByteBuffer.wrap(packetBuf).order(java.nio.ByteOrder.LITTLE_ENDIAN);
+
+                            int camp = bb.getInt();
+                            int uid = bb.getInt();
+                            int zone = bb.getInt();
+                            int heroId = bb.getInt();
+                            int rank = bb.getInt();
+                            int mythPt = bb.getInt();
+                            int matches = bb.getInt();
+                            int wins = bb.getInt();
+                            int accLv = bb.getInt();
+
+                            byte[] nameBytes = new byte[32];
+                            bb.get(nameBytes);
+                            String name = new String(nameBytes).trim();
+
+                            float wr = (matches > 0) ? ((float)wins / matches * 100f) : 0f;
+                            
+                            // Formatting sederhana teks untuk ditampilkan di tabel UI
+                            String teamStr = (camp == 1) ? "[TEAM]" : (camp == 2 ? "[ENEMY]" : "[?]");
+                            sbUi.append(teamStr).append(" ").append(name)
+                                .append("\nUID: ").append(uid).append("(").append(zone).append(")")
+                                .append(" | HeroID: ").append(heroId)
+                                .append("\nRank: ID ").append(rank).append(" (*").append(mythPt).append(")")
+                                .append(" | WR: ").append(String.format("%.1f%%", wr)).append(" (").append(matches).append(" Match)")
+                                .append("\n\n");
+                        }
+
+                        // Update UI
+                        post(() -> {
+                            if (roomTableContainer != null) {
+                                roomTableContainer.removeAllViews();
+                                TextView tv = new TextView(getContext());
+                                tv.setText(count == 0 ? "Waiting for match / No data..." : sbUi.toString());
+                                tv.setTextColor(C_TEXT);
+                                tv.setTextSize(11f);
+                                roomTableContainer.addView(tv);
+                            }
+                        });
+                    }
+                } catch (Exception e) {
+                    try { Thread.sleep(2000); } catch (InterruptedException ignored) {}
+                } finally {
+                    try { if (dis != null) dis.close(); } catch (Exception ignored) {}
+                    try { if (socket != null) socket.close(); } catch (Exception ignored) {}
+                }
+            }
+        }).start();
     }
 
     // ==================== PENGIRIMAN SOCKET KE C++ ====================
