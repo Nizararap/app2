@@ -971,7 +971,7 @@ public class OverlayView extends LinearLayout {
         colLeft.setGravity(Gravity.CENTER_VERTICAL);
         colLeft.setLayoutParams(new LayoutParams(dp(80), LayoutParams.WRAP_CONTENT));
         
-        // --- 1. HERO ICON ---
+// --- 1. HERO ICON ---
         FrameLayout heroContainer = new FrameLayout(ctx);
         heroContainer.setLayoutParams(new LayoutParams(dp(36), dp(36)));
 
@@ -979,7 +979,7 @@ public class OverlayView extends LinearLayout {
         ivHero.setLayoutParams(new FrameLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
         ivHero.setScaleType(android.widget.ImageView.ScaleType.FIT_XY);
         
-        // HAPUS RUMUS PEMBAGIAN / 10 YANG LAMA. KITA PAKA FULL ID!
+        // HAPUS RUMUS BOT (realHeroId / 10). KITA PAKAI ID MURNI DARI GAME!
         String heroFileName = getHeroNameStr(p.heroId); 
         android.graphics.Bitmap heroBmp = radar.getRawIcon(heroFileName);
 
@@ -991,7 +991,6 @@ public class OverlayView extends LinearLayout {
             ivHero.setImageBitmap(heroBmp);
             heroContainer.addView(ivHero);
         } else {
-            // JIKA GAMBAR HERO TIDAK ADA, TAMPILKAN KOTAK + ANGKA ID
             ivHero.setBackgroundColor(Color.parseColor("#444444"));
             heroContainer.addView(ivHero);
             
@@ -1144,17 +1143,19 @@ public class OverlayView extends LinearLayout {
             case 20050: return "revitalize";
             case 20060: return "aegis";
             case 20070: return "petrify";
-            case 20080: return "flicker";    // Paling sering dipakai
+            case 20080: return "flicker";
             case 20090: return "purify";
             case 20100: return "flameshot";
             case 20110: return "arrival";
             case 20120: return "vengeance";
-            default: return "unknown_spell"; // Jika tidak ketemu
+            // JIKA NANTI EXECUTE TETAP ANGKA (Misal 80001), TAMBAHKAN DI SINI:
+            // case 80001: return "execute";
+            default: return "unknown_spell"; 
         }
     }
 
-     // ==========================================
-    // TRANSLATOR LENGKAP: HERO ID -> NAMA FILE PNG
+    // ==========================================
+    // TRANSLATOR LENGKAP: HERO ID -> NAMA FILE
     // ==========================================
     private String getHeroNameStr(int heroId) {
         switch(heroId) {
@@ -1167,10 +1168,10 @@ public class OverlayView extends LinearLayout {
             case 19: return "minotaur"; case 20: return "lolita"; case 21: return "hayabusa";
             case 22: return "freya"; case 23: return "gord"; case 24: return "natalia";
             case 25: return "kagura"; case 26: return "chou"; case 27: return "sun";
-            case 28: return "alpha"; case 29: return "ruby"; case 30: return "yi_sun_shin"; // yisunshin di filemu yi sun-shin.png -> yisunshin
+            case 28: return "alpha"; case 29: return "ruby"; case 30: return "yisunshin";
             case 31: return "moskov"; case 32: return "johnson"; case 33: return "cyclops";
             case 34: return "estes"; case 35: return "hilda"; case 36: return "aurora";
-            case 37: return "lapu_lapu"; case 38: return "vexana"; case 39: return "roger";
+            case 37: return "lapulapu"; case 38: return "vexana"; case 39: return "roger";
             case 40: return "karrie"; case 41: return "gatotkaca"; case 42: return "harley";
             case 43: return "irithel"; case 44: return "grock"; case 45: return "argus";
             case 46: return "odette"; case 47: return "lancelot"; case 48: return "diggie";
@@ -1178,21 +1179,27 @@ public class OverlayView extends LinearLayout {
             case 52: return "pharsa"; case 53: return "lesley"; case 54: return "jawhead";
             case 55: return "angela"; case 56: return "gusion"; case 57: return "valir";
             case 58: return "martis"; case 59: return "uranus"; case 60: return "hanabi";
-            case 61: return "chang_e"; case 62: return "selena"; case 63: return "aldous";
-            case 64: return "claude"; case 65: return "vale"; case 66: return "leomord";
-            case 67: return "lunox"; case 68: return "hanzo"; case 69: return "esmeralda";
+            case 61: return "change"; case 62: return "kaja"; case 63: return "selena";
+            case 64: return "aldous"; case 65: return "claude"; case 66: return "vale";
+            case 67: return "leomord"; case 68: return "lunox"; case 69: return "hanzo"; 
             case 70: return "belerick"; case 71: return "kimmy"; case 72: return "thamuz";
             case 73: return "harith"; case 74: return "minsitthar"; case 75: return "kadita";
             case 76: return "badang"; case 77: return "khufra"; case 78: return "granger";
-            case 79: return "guinevere"; case 80: return "barats"; case 81: return "brody";
-            case 82: return "benedetta"; case 83: return "mathilda"; case 84: return "paquito";
-            case 85: return "beatrix"; case 86: return "phoveus"; case 87: return "yve";
-            case 88: return "aamon"; case 89: return "valentina"; case 90: return "edith";
-            case 91: return "yin"; case 92: return "melissa"; case 93: return "xavier";
-            case 94: return "julian"; case 95: return "fredrinn"; case 96: return "joy";
-            case 97: return "novaria"; case 98: return "arlott"; case 99: return "ixia";
-            case 100: return "nolan"; case 101: return "cici"; case 102: return "chip";
-            case 125: return "suyou";
+            case 79: return "guinevere"; case 80: return "esmeralda"; case 81: return "terizla";
+            case 82: return "xborg"; case 83: return "ling"; case 84: return "dyrroth"; // Dyrroth = 84!
+            case 85: return "lylia"; case 86: return "baxia"; case 87: return "masha";
+            case 88: return "wanwan"; case 89: return "silvana"; case 90: return "cecilion";
+            case 91: return "carmilla"; case 92: return "atlas"; case 93: return "popolandkupa";
+            case 94: return "yuzhong"; case 95: return "khaleed"; case 96: return "barats";
+            case 97: return "brody"; case 98: return "yve"; case 99: return "mathilda";
+            case 100: return "paquito"; case 101: return "gloo"; case 102: return "beatrix"; // Beatrix = 102!
+            case 103: return "phoveus"; case 104: return "natan"; case 105: return "aulus";
+            case 106: return "aamon"; case 107: return "valentina"; case 108: return "edith";
+            case 109: return "yin"; case 110: return "melissa"; case 111: return "xavier";
+            case 112: return "julian"; case 113: return "fredrinn"; case 114: return "joy";
+            case 115: return "novaria"; case 116: return "arlott"; case 117: return "ixia";
+            case 118: return "nolan"; case 119: return "cici"; case 120: return "chip";
+            case 121: return "zhuxin"; case 125: return "suyou";
             default: return "unknown_hero"; 
         }
     }
