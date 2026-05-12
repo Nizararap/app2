@@ -112,7 +112,7 @@ public class OverlayView extends LinearLayout {
     private void buildPanel(Context ctx) {
         panel = new LinearLayout(ctx);
         panel.setOrientation(VERTICAL);
-        panel.setMinimumWidth(dp(310));
+        panel.setMinimumWidth(dp(280));
         
         // Background with Image
         try {
@@ -305,26 +305,28 @@ public class OverlayView extends LinearLayout {
     LinearLayout t = new LinearLayout(ctx); 
     t.setOrientation(VERTICAL);
 
+    // Card 1 - Menu System
     t.addView(card(ctx, l -> {
         l.addView(secTitle(ctx, "MENU SYSTEM"));
-        l.addView(uiScaleSlider(ctx));
-        l.addView(vgap(ctx, 6));
-        l.addView(toggleRow(ctx, "Lock Position", "Disable drag & move", "ui_lock", false));
-    }));
-
-    t.addView(card(ctx, l -> {
-        l.addView(secTitle(ctx, "ACTIONS & CONFIG"));
         
-        LinearLayout cols = new LinearLayout(ctx); 
+        LinearLayout cols = new LinearLayout(ctx);
         cols.setOrientation(HORIZONTAL);
         
-        LinearLayout left = new LinearLayout(ctx); left.setOrientation(VERTICAL); 
+        LinearLayout left = new LinearLayout(ctx); 
+        left.setOrientation(VERTICAL); 
         left.setLayoutParams(new LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f));
-        left.addView(btn(ctx, "Hide Menu", C_BTN_DRK, this::showCollapsed));
-        
-        LinearLayout right = new LinearLayout(ctx); right.setOrientation(VERTICAL); 
+        left.addView(uiScaleSlider(ctx));
+        left.addView(vgap(ctx, 8));
+        left.addView(toggleRow(ctx, "Lock Position", "Disable drag & move", "ui_lock", false));
+
+        LinearLayout right = new LinearLayout(ctx); 
+        right.setOrientation(VERTICAL); 
         right.setLayoutParams(new LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f));
         right.setPadding(dp(12), 0, 0, 0);
+        
+        right.addView(secTitle(ctx, "QUICK ACTION"));
+        right.addView(btn(ctx, "Hide Menu", C_BTN_DRK, this::showCollapsed));
+        right.addView(vgap(ctx, 6));
         right.addView(btn(ctx, "Reset All Config", C_BTN_DRK, () -> {
             prefs.edit().clear().apply();
             sendConfigToCpp(prefs);
@@ -352,21 +354,19 @@ public class OverlayView extends LinearLayout {
         LinearLayout cols = new LinearLayout(ctx);
         cols.setOrientation(HORIZONTAL);
 
-        // Kolom Kiri (Toggle)
         LinearLayout left = new LinearLayout(ctx); 
         left.setOrientation(VERTICAL); 
-        left.setLayoutParams(new LayoutParams(0, LayoutParams.WRAP_CONTENT, 0.9f));
+        left.setLayoutParams(new LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f));
         left.addView(toggleRow(ctx, "Enable Radar", "Show minimap overlay", "radar_enable", false));
         left.addView(vgap(ctx, 8));
         left.addView(toggleRow(ctx, "Draw Border", "Border around radar", "radar_border", true));
 
-        // Kolom Kanan (Setting Posisi & Ukuran)
         LinearLayout right = new LinearLayout(ctx); 
         right.setOrientation(VERTICAL); 
-        right.setLayoutParams(new LayoutParams(0, LayoutParams.WRAP_CONTENT, 1.1f));
+        right.setLayoutParams(new LayoutParams(0, LayoutParams.WRAP_CONTENT, 1.05f));
         right.setPadding(dp(12), 0, 0, 0);
 
-        right.addView(secTitle(ctx, "POSITION & SIZE"));
+        right.addView(secTitle(ctx, "SIZE & POSITION"));
         right.addView(slider(ctx, "X Position", "radar_pos_x", 0, 2000, 71));
         right.addView(slider(ctx, "Map Size", "radar_size", 80, 600, 338));
         right.addView(slider(ctx, "Icon Size", "radar_icon_size", 10, 100, 37));
