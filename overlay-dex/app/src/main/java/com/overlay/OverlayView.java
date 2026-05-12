@@ -947,16 +947,16 @@ public class OverlayView extends LinearLayout {
         Context ctx = getContext();
         LinearLayout card = new LinearLayout(ctx);
         card.setOrientation(HORIZONTAL);
+        card.setGravity(Gravity.CENTER_VERTICAL);
         card.setPadding(dp(8), dp(8), dp(8), dp(8));
         
         GradientDrawable bg = new GradientDrawable();
-        // Bedakan warna border berdasar tim
         if (p.camp == 1) {
             bg.setColor(Color.parseColor("#102030"));
-            bg.setStroke(dp(1), Color.parseColor("#1565C0")); // Biru Team
+            bg.setStroke(dp(1), Color.parseColor("#1565C0")); 
         } else {
             bg.setColor(Color.parseColor("#301010"));
-            bg.setStroke(dp(1), Color.parseColor("#C62828")); // Merah Enemy
+            bg.setStroke(dp(1), Color.parseColor("#C62828")); 
         }
         bg.setCornerRadius(dp(8));
         card.setBackground(bg);
@@ -965,25 +965,55 @@ public class OverlayView extends LinearLayout {
         cardLp.setMargins(0, 0, 0, dp(6));
         card.setLayoutParams(cardLp);
 
-        // BAGIAN KIRI: Info Dasar (Hero & ID)
+        // BAGIAN KIRI: Icon Hero & Icon Spell (Menggunakan Gambar)
         LinearLayout colLeft = new LinearLayout(ctx);
-        colLeft.setOrientation(VERTICAL);
-        colLeft.setLayoutParams(new LayoutParams(dp(70), LayoutParams.WRAP_CONTENT));
+        colLeft.setOrientation(HORIZONTAL);
+        colLeft.setGravity(Gravity.CENTER_VERTICAL);
+        colLeft.setLayoutParams(new LayoutParams(dp(80), LayoutParams.WRAP_CONTENT));
         
-        TextView tvHero = new TextView(ctx);
-        tvHero.setText("H: " + p.heroId);
-        tvHero.setTextColor(Color.WHITE);
-        tvHero.setTextSize(10f);
+        // --- 1. HERO ICON ---
+        android.widget.ImageView ivHero = new android.widget.ImageView(ctx);
+        ivHero.setLayoutParams(new LayoutParams(dp(36), dp(36)));
+        ivHero.setScaleType(android.widget.ImageView.ScaleType.FIT_XY);
         
-        TextView tvSpell = new TextView(ctx);
-        tvSpell.setText("S: " + p.spellId);
-        tvSpell.setTextColor(Color.LTGRAY);
-        tvSpell.setTextSize(10f);
+        // Gunakan Translator ID ke Nama
+        String heroFileName = getHeroNameStr(p.heroId); 
+        android.graphics.Bitmap heroBmp = radar.getRawIcon(heroFileName);
+        
+        // JIKA sedang main di Custom (melawan bot H: 800+), fallback cari nama asli Bot di memory Radar
+        if (heroBmp == null && p.name != null) {
+            heroBmp = radar.getRawIcon(p.name.toLowerCase().replaceAll("[^a-z0-9]", ""));
+        }
 
-        colLeft.addView(tvHero);
-        colLeft.addView(tvSpell);
+        if (heroBmp != null) {
+            ivHero.setImageBitmap(heroBmp);
+        } else {
+            // Gambar tidak ditemukan, kasih warna abu-abu
+            ivHero.setBackgroundColor(Color.DKGRAY);
+        }
+        
+        // --- 2. SPELL ICON ---
+        android.widget.ImageView ivSpell = new android.widget.ImageView(ctx);
+        LayoutParams spellLp = new LayoutParams(dp(22), dp(22));
+        spellLp.setMargins(dp(6), 0, 0, 0); 
+        ivSpell.setLayoutParams(spellLp);
+        ivSpell.setScaleType(android.widget.ImageView.ScaleType.FIT_XY);
+        
+        // Gunakan Translator Spell ID ke Nama
+        String spellFileName = getSpellNameStr(p.spellId);
+        android.graphics.Bitmap spellBmp = radar.getRawIcon(spellFileName);
+        
+        if (spellBmp != null) {
+            ivSpell.setImageBitmap(spellBmp);
+        } else {
+            // Jika gambar spell tidak ada di heroes.bin
+            ivSpell.setBackgroundColor(Color.GRAY);
+        }
 
-        // BAGIAN TENGAH: Nama & UID
+        colLeft.addView(ivHero);
+        colLeft.addView(ivSpell);
+
+        // BAGIAN TENGAH: Nama, UID, Level Akun
         LinearLayout colMid = new LinearLayout(ctx);
         colMid.setOrientation(VERTICAL);
         colMid.setLayoutParams(new LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f));
@@ -997,9 +1027,10 @@ public class OverlayView extends LinearLayout {
         tvName.setSingleLine(true);
 
         TextView tvUid = new TextView(ctx);
-        tvUid.setText("UID: " + p.uid + " Lv." + p.accLv);
+        // Tampilkan UID dan Level
+        tvUid.setText("UID: " + p.uid + " | Lv." + p.accLv);
         tvUid.setTextColor(C_SUBTEXT);
-        tvUid.setTextSize(9f);
+        tvUid.setTextSize(9.5f);
 
         colMid.addView(tvName);
         colMid.addView(tvUid);
@@ -1011,18 +1042,20 @@ public class OverlayView extends LinearLayout {
         
         TextView tvRank = new TextView(ctx);
         tvRank.setText(getRankName(p.rank, p.mythPt));
-        tvRank.setTextColor(Color.parseColor("#FFD700")); // Warna Emas
+        tvRank.setTextColor(Color.parseColor("#FFD700")); 
         tvRank.setTextSize(10f);
         tvRank.setTypeface(null, Typeface.BOLD);
 
         float wr = (p.matches > 0) ? ((float)p.wins / p.matches * 100f) : 0f;
         TextView tvWr = new TextView(ctx);
         tvWr.setText(String.format("%.1f%% (%d M)", wr, p.matches));
-        tvWr.setTextSize(10f);
-        // Warnai WR: Hijau > 60%, Merah < 48%, sisanya abu-abu
-        if (wr > 60.0f) tvWr.setTextColor(C_GREEN);
-        else if (wr < 48.0f && p.matches > 10) tvWr.setTextColor(Color.parseColor("#EF5350"));
-        else tvWr.setTextColor(Color.LTGRAY);
+        tvWr.setTextSize(10.5f);
+        
+        // Pewarnaan Winrate Realistis
+        if (wr >= 65.0f && p.matches >= 20) tvWr.setTextColor(Color.parseColor("#00E676")); // Hijau terang (Pro)
+        else if (wr >= 50.0f) tvWr.setTextColor(Color.parseColor("#FFA726")); // Oranye (Normal)
+        else if (wr > 0f && p.matches >= 10) tvWr.setTextColor(Color.parseColor("#EF5350")); // Merah (Noob)
+        else tvWr.setTextColor(Color.LTGRAY); // Belum ada match / Bot
 
         colRight.addView(tvRank);
         colRight.addView(tvWr);
@@ -1033,27 +1066,97 @@ public class OverlayView extends LinearLayout {
 
         return card;
     }
-private final String[] strRank = {
-        "Warrior III", "Warrior II", "Warrior I",
-        "Elite III", "Elite II", "Elite I",
-        "Master IV", "Master III", "Master II", "Master I",
-        "Grandmaster V", "Grandmaster IV", "Grandmaster III", "Grandmaster II", "Grandmaster I",
-        "Epic V", "Epic IV", "Epic III", "Epic II", "Epic I",
-        "Legend V", "Legend IV", "Legend III", "Legend II", "Legend I"
+    // Array Rank Lengkap 136 Index (Sesuai source C++ kamu)
+    private final String[] strRank = {
+        "Warrior III *1", "Warrior III *2", "Warrior III *3",
+        "Warrior II *0", "Warrior II *1", "Warrior II *2", "Warrior II *3",
+        "Warrior I *0", "Warrior I *1", "Warrior I *2", "Warrior I *3",
+        "Elite III *0", "Elite III *1", "Elite III *2", "Elite III *3", "Elite III *4",
+        "Elite II *0", "Elite II *1", "Elite II *2", "Elite II *3", "Elite II *4",
+        "Elite I *0", "Elite I *1", "Elite I *2", "Elite I *3", "Elite I *4",
+        "Master IV *0", "Master IV *1", "Master IV *2", "Master IV *3", "Master IV *4",
+        "Master III *0", "Master III *1", "Master III *2", "Master III *3", "Master III *4",
+        "Master II *0", "Master II *1", "Master II *2", "Master II *3", "Master II *4",
+        "Master I *0", "Master I *1", "Master I *2", "Master I *3", "Master I *4",
+        "Grandmaster V *0", "Grandmaster V *1", "Grandmaster V *2", "Grandmaster V *3", "Grandmaster V *4", "Grandmaster V *5",
+        "Grandmaster IV *0", "Grandmaster IV *1", "Grandmaster IV *2", "Grandmaster IV *3", "Grandmaster IV *4", "Grandmaster IV *5",
+        "Grandmaster III *0", "Grandmaster III *1", "Grandmaster III *2", "Grandmaster III *3", "Grandmaster III *4", "Grandmaster III *5",
+        "Grandmaster II *0", "Grandmaster II *1", "Grandmaster II *2", "Grandmaster II *3", "Grandmaster II *4", "Grandmaster II *5",
+        "Grandmaster I *0", "Grandmaster I *1", "Grandmaster I *2", "Grandmaster I *3", "Grandmaster I *4", "Grandmaster I *5",
+        "Epic V *0", "Epic V *1", "Epic V *2", "Epic V *3", "Epic V *4", "Epic V *5",
+        "Epic IV *0", "Epic IV *1", "Epic IV *2", "Epic IV *3", "Epic IV *4", "Epic IV *5",
+        "Epic III *0", "Epic III *1", "Epic III *2", "Epic III *3", "Epic III *4", "Epic III *5",
+        "Epic II *0", "Epic II *1", "Epic II *2", "Epic II *3", "Epic II *4", "Epic II *5",
+        "Epic I *0", "Epic I *1", "Epic I *2", "Epic I *3", "Epic I *4", "Epic I *5",
+        "Legend V *0", "Legend V *1", "Legend V *2", "Legend V *3", "Legend V *4", "Legend V *5",
+        "Legend IV *0", "Legend IV *1", "Legend IV *2", "Legend IV *3", "Legend IV *4", "Legend IV *5",
+        "Legend III *0", "Legend III *1", "Legend III *2", "Legend III *3", "Legend III *4", "Legend III *5",
+        "Legend II *0", "Legend II *1", "Legend II *2", "Legend II *3", "Legend II *4", "Legend II *5",
+        "Legend I *0", "Legend I *1", "Legend I *2", "Legend I *3", "Legend I *4", "Legend I *5"
     };
 
     private String getRankName(int rankLevel, int mythPoint) {
         if (rankLevel <= 0) return "Unranked";
-        if (rankLevel <= 136) { // Dibawah Mythic
-            int index = (rankLevel / 5) - 1; // Konversi kasar, biasanya game kirim index berurutan
-            if (index >= 0 && index < strRank.length) return strRank[index];
-            return "Epic/Legend"; 
+        if (rankLevel < strRank.length) { 
+            return strRank[rankLevel];
         } else {
-            int star = rankLevel - 136; // C# Code MLBB
+            int star = rankLevel - 136; 
             if (star > 99) return "Immortal *" + star;
             if (star > 49) return "Glory *" + star;
             if (star > 24) return "Honor *" + star;
             return "Mythic *" + star;
+        }
+    }
+
+    // ==========================================
+    // TRANSLATOR: SPELL ID -> NAMA FILE PNG/WEBP
+    // ==========================================
+    private String getSpellNameStr(int spellId) {
+        switch (spellId) {
+            case 20010: return "execute";
+            case 20020: return "retribution";
+            case 20030: return "inspire";
+            case 20040: return "sprint";
+            case 20050: return "revitalize";
+            case 20060: return "aegis";
+            case 20070: return "petrify";
+            case 20080: return "flicker";    // Paling sering dipakai
+            case 20090: return "purify";
+            case 20100: return "flameshot";
+            case 20110: return "arrival";
+            case 20120: return "vengeance";
+            default: return "unknown_spell"; // Jika tidak ketemu
+        }
+    }
+
+    // ==========================================
+    // TRANSLATOR: HERO ID -> NAMA FILE PNG/WEBP
+    // ==========================================
+    private String getHeroNameStr(int heroId) {
+        switch(heroId) {
+            case 1: return "miya";
+            case 2: return "balmond";
+            case 3: return "saber";
+            case 4: return "alice";
+            case 5: return "nana";
+            case 6: return "tigreal";
+            case 7: return "alucard";
+            case 8: return "karina";
+            case 9: return "akai";
+            case 10: return "franco";
+            case 11: return "bane";
+            case 12: return "bruno";
+            case 13: return "clint";
+            case 14: return "rafaela";
+            case 15: return "eudora";
+            case 16: return "zilong";
+            case 17: return "fanny";
+            case 18: return "layla";
+            case 19: return "minotaur";
+            case 20: return "lolita";
+            // Lanjutkan list ini sesuai Hero ID MLBB jika perlu
+            // (Hero baru misal: 125 = suyou, dst)
+            default: return "unknown_hero"; 
         }
     }
 

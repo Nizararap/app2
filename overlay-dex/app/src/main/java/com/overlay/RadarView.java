@@ -100,12 +100,16 @@ public class RadarView extends View {
             ZipEntry entry;
             
             while ((entry = zis.getNextEntry()) != null) {
-                if (entry.getName().endsWith(".png")) {
-                    // Decode PNG yang ada di dalam ZIP
+                String name = entry.getName().toLowerCase();
+                if (name.endsWith(".png") || name.endsWith(".webp")) {
+                    // Decode PNG/WEBP yang ada di dalam ZIP
                     Bitmap bmp = BitmapFactory.decodeStream(zis);
                     if (bmp != null) {
-                        // Kunci pencarian: hilangkan ".png", jadikan huruf kecil, buang spasi
-                        String searchKey = entry.getName().replace(".png", "").toLowerCase().replaceAll("[^a-z0-9]", "");
+                        // Kunci pencarian: hilangkan ekstensi, jadikan huruf kecil, buang spasi
+                        String searchKey = entry.getName()
+                                .replace(".png", "")
+                                .replace(".webp", "")
+                                .toLowerCase().replaceAll("[^a-z0-9]", "");
                         preloadedIcons.put(searchKey, bmp); // Simpan mentahannya di RAM
                     }
                 }
@@ -292,6 +296,14 @@ public class RadarView extends View {
             }
         }
         return names;
+    }
+
+    // Fungsi untuk meminjam icon mentah dari cache RAM
+    public Bitmap getRawIcon(String key) {
+        if (preloadedIcons != null && preloadedIcons.containsKey(key)) {
+            return preloadedIcons.get(key);
+        }
+        return null;
     }
 
     public void destroy() { isRunning = false; }
