@@ -217,34 +217,36 @@ public class OverlayView extends LinearLayout {
     frame.addView(tabCombat);
     frame.addView(tabRoom);
 
-    // ✅ PERBAIKAN: Tambahkan parameter LayoutParams WRAP_CONTENT
+    // ✅ PERBAIKAN: Tambahkan LayoutParams WRAP_CONTENT
     scrollView.addView(frame, new FrameLayout.LayoutParams(
-            ViewGroup.LayoutParams.WRAP_CONTENT,
-            ViewGroup.LayoutParams.WRAP_CONTENT));
+            FrameLayout.LayoutParams.WRAP_CONTENT,
+            FrameLayout.LayoutParams.WRAP_CONTENT));
 
-    
-        int statusBarH = 0;
-        try {
-            int resId = ctx.getResources().getIdentifier("status_bar_height", "dimen", "android");
-            if (resId > 0) statusBarH = ctx.getResources().getDimensionPixelSize(resId);
-        } catch (Exception ignored) {}
-        final int maxScrollH = Math.max(dp(80), realScreenH - statusBarH - dp(100));
+    scrollView.setLayoutParams(new LayoutParams(LayoutParams.MATCH_PARENT,
+            LayoutParams.WRAP_CONTENT));
 
-        scrollView.getViewTreeObserver().addOnGlobalLayoutListener(
-            new android.view.ViewTreeObserver.OnGlobalLayoutListener() {
-                @Override
-                public void onGlobalLayout() {
-                    scrollView.getViewTreeObserver().removeOnGlobalLayoutListener(this);
-                    if (scrollView.getHeight() > maxScrollH) {
-                        scrollView.setLayoutParams(
-                            new LayoutParams(LayoutParams.MATCH_PARENT, maxScrollH));
-                    }
+    int statusBarH = 0;
+    try {
+        int resId = ctx.getResources().getIdentifier("status_bar_height", "dimen", "android");
+        if (resId > 0) statusBarH = ctx.getResources().getDimensionPixelSize(resId);
+    } catch (Exception ignored) {}
+    final int maxScrollH = Math.max(dp(80), realScreenH - statusBarH - dp(100));
+
+    scrollView.getViewTreeObserver().addOnGlobalLayoutListener(
+        new android.view.ViewTreeObserver.OnGlobalLayoutListener() {
+            @Override
+            public void onGlobalLayout() {
+                scrollView.getViewTreeObserver().removeOnGlobalLayoutListener(this);
+                if (scrollView.getHeight() > maxScrollH) {
+                    scrollView.setLayoutParams(
+                        new LayoutParams(LayoutParams.MATCH_PARENT, maxScrollH));
                 }
             }
-        );
+        }
+    );
 
-        return scrollView;
-    }
+    return scrollView;
+}
 
     // ==================== DASHBOARD ====================
     private LinearLayout buildDash(Context ctx) {
