@@ -838,78 +838,75 @@ public class OverlayView extends LinearLayout {
     }
 
     private void startRoomSocketThread() {
-        new Thread(() -> {
-            while (isRoomSocketRunning) {
-                android.net.LocalSocket socket = null;
-                java.io.DataInputStream dis = null;
-                try {
-                    socket = new android.net.LocalSocket();
-                    socket.connect(new android.net.LocalSocketAddress("mlbb_room_socket", android.net.LocalSocketAddress.Namespace.ABSTRACT));
-                    dis = new java.io.DataInputStream(socket.getInputStream());
+    new Thread(() -> {
+        while (isRoomSocketRunning) {
+            android.net.LocalSocket socket = null;
+            java.io.DataInputStream dis = null;
+            try {
+                socket = new android.net.LocalSocket();
+                socket.connect(new android.net.LocalSocketAddress("mlbb_room_socket", android.net.LocalSocketAddress.Namespace.ABSTRACT));
+                dis = new java.io.DataInputStream(socket.getInputStream());
 
-                    byte[] countBuf = new byte[4];
-                    // 64 Bytes sesuai struct di C++: camp(4) + uid(4) + zoneId(4) + heroId(4) + rankLevel(4) + mythPoint(4) + totalMatches(4) + totalWins(4) + accLevel(4) + name(32) = 68 Bytes. Oh tunggu: 9*4 = 36 + 32 = 68 byte!
-                    byte[] packetBuf = new byte[68];
+                byte[] countBuf = new byte[4];
+                byte[] packetBuf = new byte[68];
 
-                    while (isRoomSocketRunning) {
-                        dis.readFully(countBuf);
-                        int count = java.nio.ByteBuffer.wrap(countBuf).order(java.nio.ByteOrder.LITTLE_ENDIAN).getInt();
+                while (isRoomSocketRunning) {
+                    dis.readFully(countBuf);
+                    int count = java.nio.ByteBuffer.wrap(countBuf).order(java.nio.ByteOrder.LITTLE_ENDIAN).getInt();
+                    if (count > 10 || count < 0) count = 0;
 
-                        if (count > 10 || count < 0) count = 0;
+                    final StringBuilder sbUi = new StringBuilder();
+                    for (int i = 0; i < count; i++) {
+                        dis.readFully(packetBuf);
+                        java.nio.ByteBuffer bb = java.nio.ByteBuffer.wrap(packetBuf).order(java.nio.ByteOrder.LITTLE_ENDIAN);
 
-                        final StringBuilder sbUi = new StringBuilder();
-                        
-                        for (int i = 0; i < count; i++) {
-                            dis.readFully(packetBuf);
-                            java.nio.ByteBuffer bb = java.nio.ByteBuffer.wrap(packetBuf).order(java.nio.ByteOrder.LITTLE_ENDIAN);
+                        int camp = bb.getInt();
+                        int uid = bb.getInt();
+                        int zone = bb.getInt();
+                        int heroId = bb.getInt();
+                        int rank = bb.getInt();
+                        int mythPt = bb.getInt();
+                        int matches = bb.getInt();
+                        int wins = bb.getInt();
+                        int accLv = bb.getInt();
 
-                            int camp = bb.getInt();
-                            int uid = bb.getInt();
-                            int zone = bb.getInt();
-                            int heroId = bb.getInt();
-                            int rank = bb.getInt();
-                            int mythPt = bb.getInt();
-                            int matches = bb.getInt();
-                            int wins = bb.getInt();
-                            int accLv = bb.getInt();
+                        byte[] nameBytes = new byte[32];
+                        bb.get(nameBytes);
+                        String name = new String(nameBytes).trim();
 
-                            byte[] nameBytes = new byte[32];
-                            bb.get(nameBytes);
-                            String name = new String(nameBytes).trim();
-
-                            float wr = (matches > 0) ? ((float)wins / matches * 100f) : 0f;
-                            
-                            // Formatting sederhana teks untuk ditampilkan di tabel UI
-                            String teamStr = (camp == 1) ? "[TEAM]" : (camp == 2 ? "[ENEMY]" : "[?]");
-                            sbUi.append(teamStr).append(" ").append(name)
-                                .append("\nUID: ").append(uid).append("(").append(zone).append(")")
-                                .append(" | HeroID: ").append(heroId)
-                                .append("\nRank: ID ").append(rank).append(" (*").append(mythPt).append(")")
-                                .append(" | WR: ").append(String.format("%.1f%%", wr)).append(" (").append(matches).append(" Match)")
-                                .append("\n\n");
-                        }
-
-                        // Update UI
-                        post(() -> {
-                            if (roomTableContainer != null) {
-                                roomTableContainer.removeAllViews();
-                                TextView tv = new TextView(getContext());
-                                tv.setText(count == 0 ? "Waiting for match / No data..." : sbUi.toString());
-                                tv.setTextColor(C_TEXT);
-                                tv.setTextSize(11f);
-                                roomTableContainer.addView(tv);
-                            }
-                        });
+                        float wr = (matches > 0) ? ((float)wins / matches * 100f) : 0f;
+                        String teamStr = (camp == 1) ? "[TEAM]" : (camp == 2 ? "[ENEMY]" : "[?]");
+                        sbUi.append(teamStr).append(" ").append(name)
+                            .append("\nUID: ").append(uid).append("(").append(zone).append(")")
+                            .append(" | HeroID: ").append(heroId)
+                            .append("\nRank: ID ").append(rank).append(" (*").append(mythPt).append(")")
+                            .append(" | WR: ").append(String.format("%.1f%%", wr)).append(" (").append(matches).append(" Match)")
+                            .append("\n\n");
                     }
-                } catch (Exception e) {
-                    try { Thread.sleep(2000); } catch (InterruptedException ignored) {}
-                } finally {
-                    try { if (dis != null) dis.close(); } catch (Exception ignored) {}
-                    try { if (socket != null) socket.close(); } catch (Exception ignored) {}
+
+                    // 👇 Salin ke variabel final agar bisa dipakai di lambda
+                    final int finalCount = count;
+                    final StringBuilder finalSbUi = sbUi;
+                    post(() -> {
+                        if (roomTableContainer != null) {
+                            roomTableContainer.removeAllViews();
+                            TextView tv = new TextView(getContext());
+                            tv.setText(finalCount == 0 ? "Waiting for match / No data..." : finalSbUi.toString());
+                            tv.setTextColor(C_TEXT);
+                            tv.setTextSize(11f);
+                            roomTableContainer.addView(tv);
+                        }
+                    });
                 }
+            } catch (Exception e) {
+                try { Thread.sleep(2000); } catch (InterruptedException ignored) {}
+            } finally {
+                try { if (dis != null) dis.close(); } catch (Exception ignored) {}
+                try { if (socket != null) socket.close(); } catch (Exception ignored) {}
             }
-        }).start();
-    }
+        }
+    }).start();
+}
 
     // ==================== PENGIRIMAN SOCKET KE C++ ====================
     private void sendConfigToCpp(SharedPreferences prefs) {
