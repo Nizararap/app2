@@ -112,7 +112,7 @@ public class OverlayView extends LinearLayout {
     private void buildPanel(Context ctx) {
         panel = new LinearLayout(ctx);
         panel.setOrientation(VERTICAL);
-        panel.setMinimumWidth(dp(280));
+        panel.setMinimumWidth(dp(265));
         
         // Background with Image
         try {
@@ -305,39 +305,24 @@ public class OverlayView extends LinearLayout {
     LinearLayout t = new LinearLayout(ctx); 
     t.setOrientation(VERTICAL);
 
-    // Card 1 - Menu System
     t.addView(card(ctx, l -> {
         l.addView(secTitle(ctx, "MENU SYSTEM"));
-        
-        LinearLayout cols = new LinearLayout(ctx);
-        cols.setOrientation(HORIZONTAL);
-        
-        LinearLayout left = new LinearLayout(ctx); 
-        left.setOrientation(VERTICAL); 
-        left.setLayoutParams(new LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f));
-        left.addView(uiScaleSlider(ctx));
-        left.addView(vgap(ctx, 8));
-        left.addView(toggleRow(ctx, "Lock Position", "Disable drag & move", "ui_lock", false));
+        l.addView(uiScaleSlider(ctx));
+        l.addView(vgap(ctx, 8));
+        l.addView(toggleRow(ctx, "Lock Position", "Disable drag & move", "ui_lock", false));
+    }));
 
-        LinearLayout right = new LinearLayout(ctx); 
-        right.setOrientation(VERTICAL); 
-        right.setLayoutParams(new LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f));
-        right.setPadding(dp(12), 0, 0, 0);
-        
-        right.addView(secTitle(ctx, "QUICK ACTION"));
-        right.addView(btn(ctx, "Hide Menu", C_BTN_DRK, this::showCollapsed));
-        right.addView(vgap(ctx, 6));
-        right.addView(btn(ctx, "Reset All Config", C_BTN_DRK, () -> {
+    t.addView(card(ctx, l -> {
+        l.addView(secTitle(ctx, "ACTIONS"));
+        l.addView(btn(ctx, "Hide Menu", C_BTN_DRK, this::showCollapsed));
+        l.addView(vgap(ctx, 8));
+        l.addView(btn(ctx, "Reset All Config", C_BTN_DRK, () -> {
             prefs.edit().clear().apply();
             sendConfigToCpp(prefs);
             refreshAllUI();
             radar.invalidate();
             android.widget.Toast.makeText(ctx, "All settings reset", android.widget.Toast.LENGTH_SHORT).show();
         }));
-
-        cols.addView(left);
-        cols.addView(right);
-        l.addView(cols);
     }));
 
     return t;
@@ -350,43 +335,28 @@ public class OverlayView extends LinearLayout {
 
     t.addView(card(ctx, l -> {
         l.addView(secTitle(ctx, "RADAR"));
+        l.addView(toggleRow(ctx, "Enable Radar", "Show minimap overlay", "radar_enable", false));
+        l.addView(vgap(ctx, 6));
+        l.addView(toggleRow(ctx, "Draw Border", "Border around radar", "radar_border", true));
+    }));
 
-        LinearLayout cols = new LinearLayout(ctx);
-        cols.setOrientation(HORIZONTAL);
-
-        LinearLayout left = new LinearLayout(ctx); 
-        left.setOrientation(VERTICAL); 
-        left.setLayoutParams(new LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f));
-        left.addView(toggleRow(ctx, "Enable Radar", "Show minimap overlay", "radar_enable", false));
-        left.addView(vgap(ctx, 8));
-        left.addView(toggleRow(ctx, "Draw Border", "Border around radar", "radar_border", true));
-
-        LinearLayout right = new LinearLayout(ctx); 
-        right.setOrientation(VERTICAL); 
-        right.setLayoutParams(new LayoutParams(0, LayoutParams.WRAP_CONTENT, 1.05f));
-        right.setPadding(dp(12), 0, 0, 0);
-
-        right.addView(secTitle(ctx, "SIZE & POSITION"));
-        right.addView(slider(ctx, "X Position", "radar_pos_x", 0, 2000, 71));
-        right.addView(slider(ctx, "Map Size", "radar_size", 80, 600, 338));
-        right.addView(slider(ctx, "Icon Size", "radar_icon_size", 10, 100, 37));
-
-        right.addView(vgap(ctx, 8));
-        right.addView(btn(ctx, "Reset Defaults", C_BTN_DRK, () -> {
+    t.addView(card(ctx, l -> {
+        l.addView(secTitle(ctx, "SIZE & POSITION"));
+        l.addView(slider(ctx, "X Position", "radar_pos_x", 0, 2000, 71));
+        l.addView(slider(ctx, "Map Size", "radar_size", 80, 600, 338));
+        l.addView(slider(ctx, "Icon Size", "radar_icon_size", 10, 100, 37));
+        
+        l.addView(vgap(ctx, 8));
+        l.addView(btn(ctx, "Reset Defaults", C_BTN_DRK, () -> {
             prefs.edit().putFloat("radar_pos_x",71f)
                 .putFloat("radar_size",338f)
                 .putFloat("radar_icon_size",37f).apply();
             radar.invalidate();
         }));
-
-        cols.addView(left);
-        cols.addView(right);
-        l.addView(cols);
     }));
 
     return t;
 }
-
     // ==================== COMBAT & AIM ====================
     private LinearLayout buildCombat(Context ctx) {
         LinearLayout t = new LinearLayout(ctx); t.setOrientation(VERTICAL);
