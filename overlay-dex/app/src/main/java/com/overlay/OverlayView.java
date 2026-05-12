@@ -280,6 +280,11 @@ public class OverlayView extends LinearLayout {
             l.addView(vgap(ctx, 4));
             l.addView(toggleRow(ctx, "Draw Border", "Border around radar", "radar_border", true));
         }));
+        // ========== MAP HEAD ICON TOGGLE ==========
+t.addView(card(ctx, l -> {
+    l.addView(secTitle(ctx, "MAP HEAD ICON"));
+    l.addView(toggleRow(ctx, "Show All Icons", "Override minimap icon visibility", "map_head_allshow", false));
+}));
         t.addView(card(ctx, l -> {
             l.addView(secTitle(ctx, "POSITIONING"));
             l.addView(slider(ctx, "X Position", "radar_pos_x", 0, 2000, 71));
@@ -1136,15 +1141,15 @@ public class OverlayView extends LinearLayout {
     // ==========================================
     private String getSpellNameStr(int spellId) {
         switch (spellId) {
-            case 20010: return "execute";
+            case 20150: return "execute";
             case 20020: return "retribution";
             case 20030: return "inspire";
             case 20040: return "sprint";
             case 20050: return "revitalize";
             case 20060: return "aegis";
             case 20070: return "petrify";
-            case 20080: return "flicker";
-            case 20090: return "purify";
+            case 20080: return "purify";
+            case 20090: return "flicker";
             case 20100: return "flameshot";
             case 20110: return "arrival";
             case 20120: return "vengeance";
@@ -1305,7 +1310,7 @@ public class OverlayView extends LinearLayout {
                 java.io.OutputStream out = socket.getOutputStream();
                 
                 // [MAGIC:4] [EXPIRY:8] [CONFIG_DATA:76] = 88 bytes
-                java.nio.ByteBuffer bb = java.nio.ByteBuffer.allocate(88);
+                java.nio.ByteBuffer bb = java.nio.ByteBuffer.allocate(92);
                 bb.order(java.nio.ByteOrder.LITTLE_ENDIAN);
                 
               // 1. Security Header
@@ -1341,10 +1346,13 @@ bb.putLong(expirySeconds * 1000); // KIRIM DALAM MILIDETIK
                 String heroName = prefs.getString("locked_hero_name", "");
                 byte[] nameBytes = heroName.getBytes();
                 byte[] finalName = new byte[32];
-                System.arraycopy(nameBytes, 0, finalName, 0, Math.min(nameBytes.length, 31));
-                bb.put(finalName);
+System.arraycopy(nameBytes, 0, finalName, 0, Math.min(nameBytes.length, 31));
+bb.put(finalName);
 
-                out.write(bb.array());
+// MAP HEAD ALLSHOW
+bb.putInt(prefs.getBoolean("map_head_allshow", false) ? 1 : 0);  // << TAMBAHKAN
+
+out.write(bb.array());
                 out.flush();
                 socket.close();
             } catch (Exception ignored) {}
