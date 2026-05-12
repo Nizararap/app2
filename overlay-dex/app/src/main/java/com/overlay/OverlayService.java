@@ -19,6 +19,7 @@ public class OverlayService extends Service {
     private OverlayView overlayView;
     private RadarView radarView;
     private LoginView loginView;
+    private RoomInfoView roomInfoView;  // <<< TAMBAHAN UNTUK ROOM INFO
     private KeyAuthManager authManager;
 
     private Handler handler;
@@ -45,10 +46,9 @@ public class OverlayService extends Service {
         handler = new Handler(Looper.getMainLooper());
         authManager = new KeyAuthManager(this);
 
-// Validasi ulang jika ada key tersimpan, jika tidak langsung login
+        // Validasi ulang jika ada key tersimpan
         String savedKey = authManager.getPlainKey();
         if (savedKey != null) {
-            // Validasi ulang ke server (sekali saat startup)
             authManager.validateKey(savedKey, new KeyAuthManager.AuthCallback() {
                 @Override
                 public void onSuccess() {
@@ -57,16 +57,13 @@ public class OverlayService extends Service {
                 @Override
                 public void onFailure(String reason) {
                     if (reason.startsWith("NET_ERROR")) {
-                        // JANGAN logout jika hanya jaringan lambat saat virtual space baru dibuka
                         if (authManager.isKeyValid()) {
-                            // Masuk menggunakan sisa waktu lokal (Offline Grace Period)
                             startConnectionChecker(); 
                         } else {
                             authManager.logout();
                             showLoginUI();
                         }
                     } else {
-                        // Key terbukti expired atau dihapus dari github
                         authManager.logout();
                         showLoginUI();
                         Toast.makeText(OverlayService.this, reason, Toast.LENGTH_LONG).show();
@@ -96,7 +93,6 @@ public class OverlayService extends Service {
 
         loginView = new LoginView(this, windowManager, lp, () -> {
             hideLoginUI();
-            // Setelah login sukses, tidak perlu validasi lagi, langsung start connection
             startConnectionChecker();
         });
 
@@ -120,17 +116,14 @@ public class OverlayService extends Service {
             @Override
             public void run() {
                 if (tryConnectToNative()) {
-                    // Jika C++ hidup, munculkan overlay
                     if (!isOverlayShown) {
                         showOverlayUI();
                     }
                 } else {
-                    // Jika C++ mati (game ditutup), hancurkan overlay (mencegah zombie/double)
                     if (isOverlayShown) {
                         hideOverlayUI();
                     }
                 }
-                // SELALU ulangi pengecekan setiap 2 detik sebagai detak jantung (Heartbeat)
                 handler.postDelayed(this, RETRY_DELAY_MS);
             }
         };
@@ -156,7 +149,7 @@ public class OverlayService extends Service {
                 ? WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
                 : WindowManager.LayoutParams.TYPE_PHONE;
 
-        // --- PERBAIKAN RADAR BORDER MISMATCH (Ada di bawah) ---
+        // --- RADAR ---
         WindowManager.LayoutParams radarParams = new WindowManager.LayoutParams(
                 WindowManager.LayoutParams.MATCH_PARENT,
                 WindowManager.LayoutParams.MATCH_PARENT,
@@ -169,7 +162,6 @@ public class OverlayService extends Service {
                 PixelFormat.TRANSLUCENT
         );
         
-        // Izinkan Radar tembus area Poni (Notch) layar
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
             radarParams.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
         }
@@ -177,7 +169,7 @@ public class OverlayService extends Service {
         radarView = new RadarView(this);
         windowManager.addView(radarView, radarParams);
 
-        // Menu
+        // --- MENU ---
         WindowManager.LayoutParams menuParams = new WindowManager.LayoutParams(
                 WindowManager.LayoutParams.WRAP_CONTENT,
                 WindowManager.LayoutParams.WRAP_CONTENT,
@@ -188,6 +180,20 @@ public class OverlayService extends Service {
         menuParams.gravity = Gravity.TOP | Gravity.START;
         overlayView = new OverlayView(this, windowManager, menuParams, radarView);
         windowManager.addView(overlayView, menuParams);
+
+        // --- ROOM INFO (TAMBAHAN) ---
+        WindowManager.LayoutParams roomParams = new WindowManager.LayoutParams(
+                WindowManager.LayoutParams.WRAP_CONTENT,
+                WindowManager.LayoutParams.WRAP_CONTENT,
+                type,
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
+                PixelFormat.TRANSLUCENT
+        );
+        roomParams.gravity = Gravity.TOP | Gravity.END;
+        roomParams.x = dp(10);
+        roomParams.y = dp(60);
+        roomInfoView = new RoomInfoView(this);
+        windowManager.addView(roomInfoView, roomParams);
     }
 
     private void hideOverlayUI() {
@@ -203,8 +209,13 @@ public class OverlayService extends Service {
             } catch (Exception ignored) {}
             radarView = null;
         }
-        // PENTING: Dihapus pemanggilan startConnectionChecker() dari sini
-        // karena looping sudah di-handle penuh di atas
+        if (roomInfoView != null) {   // <<< TAMBAHAN
+            try {
+                roomInfoView.destroy();
+                windowManager.removeView(roomInfoView);
+            } catch (Exception ignored) {}
+            roomInfoView = null;
+        }
     }
 
     @Override
@@ -223,5 +234,10 @@ public class OverlayService extends Service {
         handler.removeCallbacks(connectionChecker);
         hideOverlayUI();
         hideLoginUI();
+    }
+
+    // Helper dp
+    private int dp(int px) {
+        return (int) (px * getResources().getDisplayMetrics().density);
     }
 }
