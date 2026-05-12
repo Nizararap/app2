@@ -124,7 +124,7 @@ public class RadarView extends View {
 
     private void initPaints() {
         borderPaint = new Paint();
-        borderPaint.setColor(Color.argb(120, 124, 77, 255)); // Semi-transparent Purple
+        borderPaint.setColor(Color.argb(120, 255, 215, 0)); // Semi-transparent Gold
         borderPaint.setStyle(Paint.Style.STROKE);
         borderPaint.setStrokeWidth(2f); // Thinner border
         borderPaint.setAntiAlias(true);

@@ -25,16 +25,16 @@ import android.widget.TextView;
 public class OverlayView extends LinearLayout {
 
     // Modern Glassmorphism Palette
-    private static final int C_BG      = Color.argb(235, 18, 18, 28); // Deeper, semi-transparent
-    private static final int C_CARD    = Color.parseColor("#252538");
-    private static final int C_HEADER  = Color.argb(255, 13, 13, 20);
-    private static final int C_ACCENT  = Color.parseColor("#7C4DFF"); // Vibrant Purple
-    private static final int C_GREEN   = Color.parseColor("#00F5A0"); // Neon Mint
+    private static final int C_BG      = Color.argb(210, 10, 10, 15); // Darker with more transparency for image bg
+    private static final int C_CARD    = Color.argb(160, 25, 25, 35); // Semi-transparent card
+    private static final int C_HEADER  = Color.argb(240, 5, 5, 10);
+    private static final int C_ACCENT  = Color.parseColor("#FFD700"); // Gold Accent
+    private static final int C_GREEN   = Color.parseColor("#FFD700"); // Use Gold for consistency
     private static final int C_TEXT    = Color.parseColor("#FFFFFF");
-    private static final int C_SUBTEXT = Color.parseColor("#A0A0B8");
-    private static final int C_DIVIDER = Color.parseColor("#2D2D3F");
-    private static final int C_BTN_BLU = Color.parseColor("#6200EE");
-    private static final int C_BTN_DRK = Color.parseColor("#2D2D3F");
+    private static final int C_SUBTEXT = Color.parseColor("#D4AF37"); // Muted Gold/Bronze
+    private static final int C_DIVIDER = Color.argb(80, 255, 215, 0); // Gold divider
+    private static final int C_BTN_BLU = Color.parseColor("#FFD700");
+    private static final int C_BTN_DRK = Color.argb(180, 20, 20, 30);
 
     private final WindowManager wm;
     private final WindowManager.LayoutParams lp;
@@ -89,22 +89,22 @@ public class OverlayView extends LinearLayout {
 
     private void buildPill(Context ctx) {
         tvPill = new TextView(ctx);
-        tvPill.setText("󱐋"); // Lightning bolt icon
+        tvPill.setText("󱐋");
         if (tvPill.getText().length() > 1) tvPill.setText("M");
-        tvPill.setTextColor(Color.WHITE);
-        tvPill.setTextSize(14f); // Smaller font
+        tvPill.setTextColor(Color.BLACK); // Black text on Gold bg
+        tvPill.setTextSize(14f);
         tvPill.setTypeface(null, Typeface.BOLD);
         tvPill.setGravity(Gravity.CENTER);
-        tvPill.setPadding(dp(10), dp(10), dp(10), dp(10)); // Smaller padding
+        tvPill.setPadding(dp(10), dp(10), dp(10), dp(10));
         
         GradientDrawable bg = new GradientDrawable();
         bg.setShape(GradientDrawable.OVAL);
-        bg.setColors(new int[]{C_ACCENT, Color.parseColor("#9C27B0")}); 
+        bg.setColors(new int[]{C_ACCENT, Color.parseColor("#B8860B")}); // Gold to Dark Goldenrod
         bg.setOrientation(GradientDrawable.Orientation.TL_BR);
-        bg.setStroke(dp(1), Color.argb(150, 255, 255, 255)); // Thinner border
+        bg.setStroke(dp(1), Color.argb(200, 255, 255, 255));
         
         tvPill.setBackground(bg);
-        tvPill.setElevation(dp(4)); // Lower elevation
+        tvPill.setElevation(dp(4));
         tvPill.setOnTouchListener(dragL);
         addView(tvPill);
     }
@@ -113,11 +113,41 @@ public class OverlayView extends LinearLayout {
         panel = new LinearLayout(ctx);
         panel.setOrientation(VERTICAL);
         panel.setMinimumWidth(dp(310));
-        GradientDrawable bg = new GradientDrawable();
-        bg.setColor(C_BG);
-        bg.setCornerRadius(dp(22));
-        bg.setStroke(dp(1), Color.argb(60, 124, 77, 255));
-        panel.setBackground(bg);
+        
+        // Background with Image
+        try {
+            android.graphics.Bitmap bmp = android.graphics.BitmapFactory.decodeStream(ctx.getAssets().open("background.jpg"));
+            if (bmp != null) {
+                // Add a dark overlay on top of the image
+                android.graphics.Bitmap overlay = android.graphics.Bitmap.createBitmap(bmp.getWidth(), bmp.getHeight(), bmp.getConfig());
+                android.graphics.Canvas canvas = new android.graphics.Canvas(overlay);
+                canvas.drawBitmap(bmp, 0, 0, null);
+                canvas.drawColor(Color.argb(180, 0, 0, 0)); // Dark overlay
+                
+                android.graphics.drawable.BitmapDrawable bd = new android.graphics.drawable.BitmapDrawable(ctx.getResources(), overlay);
+                panel.setBackground(bd);
+            } else {
+                panel.setBackgroundColor(C_BG);
+            }
+        } catch (Exception e) {
+            GradientDrawable bg = new GradientDrawable();
+            bg.setColor(C_BG);
+            bg.setCornerRadius(dp(22));
+            bg.setStroke(dp(1), C_ACCENT);
+            panel.setBackground(bg);
+        }
+
+        // Clip to rounded corners
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
+            panel.setOutlineProvider(new android.view.ViewOutlineProvider() {
+                @Override
+                public void getOutline(android.view.View view, android.graphics.Outline outline) {
+                    outline.setRoundRect(0, 0, view.getWidth(), view.getHeight(), dp(22));
+                }
+            });
+            panel.setClipToOutline(true);
+        }
+
         panel.addView(buildHeader(ctx));
         panel.addView(buildTabs(ctx));
         panel.addView(buildContent(ctx));
@@ -207,9 +237,9 @@ public class OverlayView extends LinearLayout {
             boolean a = i == idx;
             tabBtns[i].setTextColor(a ? C_ACCENT : C_SUBTEXT);
             GradientDrawable tbg = new GradientDrawable();
-            tbg.setColor(a ? Color.argb(25, 124, 77, 255) : Color.argb(10, 255, 255, 255));
+            tbg.setColor(a ? Color.argb(40, 255, 215, 0) : Color.argb(15, 255, 255, 255));
             tbg.setCornerRadius(dp(12));
-            if (a) tbg.setStroke(dp(1), Color.argb(120, 124, 77, 255));
+            if (a) tbg.setStroke(dp(1), Color.argb(150, 255, 215, 0));
             else tbg.setStroke(dp(1), Color.argb(20, 255, 255, 255));
             tabBtns[i].setBackground(tbg);
         }
@@ -851,7 +881,7 @@ public class OverlayView extends LinearLayout {
         GradientDrawable gd = new GradientDrawable();
         gd.setColor(C_CARD);
         gd.setCornerRadius(dp(16));
-        gd.setStroke(dp(1), Color.argb(80, 0, 212, 255)); // Border neon tipis
+        bg.setStroke(dp(1), Color.argb(100, 255, 215, 0));// Border neon tipis
         card.setBackground(gd);
         card.setPadding(dp(20), dp(20), dp(20), dp(20));
         

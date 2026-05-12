@@ -22,11 +22,11 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 public class LoginView extends LinearLayout {
-    private static final int C_BG = Color.argb(235, 18, 18, 28);
-    private static final int C_ACCENT = Color.parseColor("#7C4DFF");
+    private static final int C_BG = Color.argb(210, 10, 10, 15);
+    private static final int C_ACCENT = Color.parseColor("#FFD700");
     private static final int C_TEXT = Color.parseColor("#FFFFFF");
-    private static final int C_SUBTEXT = Color.parseColor("#A0A0B8");
-    private static final int C_CARD = Color.parseColor("#252538");
+    private static final int C_SUBTEXT = Color.parseColor("#D4AF37");
+    private static final int C_CARD = Color.argb(160, 25, 25, 35);
 
     private final WindowManager wm;
     private final WindowManager.LayoutParams lp;
@@ -99,11 +99,36 @@ public class LoginView extends LinearLayout {
         loginCard.setPadding(dp(20), dp(20), dp(20), dp(20));
         loginCard.setGravity(Gravity.CENTER_HORIZONTAL);
         
-        GradientDrawable gd = new GradientDrawable();
-        gd.setColor(C_BG);
-        gd.setCornerRadius(dp(24));
-        gd.setStroke(dp(1), Color.argb(80, 124, 77, 255));
-        loginCard.setBackground(gd);
+        // Background with Image for Login
+        try {
+            android.graphics.Bitmap bmp = android.graphics.BitmapFactory.decodeStream(ctx.getAssets().open("background.jpg"));
+            if (bmp != null) {
+                android.graphics.Bitmap overlay = android.graphics.Bitmap.createBitmap(bmp.getWidth(), bmp.getHeight(), bmp.getConfig());
+                android.graphics.Canvas canvas = new android.graphics.Canvas(overlay);
+                canvas.drawBitmap(bmp, 0, 0, null);
+                canvas.drawColor(Color.argb(180, 0, 0, 0));
+                android.graphics.drawable.BitmapDrawable bd = new android.graphics.drawable.BitmapDrawable(ctx.getResources(), overlay);
+                loginCard.setBackground(bd);
+            } else {
+                loginCard.setBackgroundColor(C_BG);
+            }
+        } catch (Exception e) {
+            GradientDrawable gd = new GradientDrawable();
+            gd.setColor(C_BG);
+            gd.setCornerRadius(dp(24));
+            gd.setStroke(dp(1), C_ACCENT);
+            loginCard.setBackground(gd);
+        }
+
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
+            loginCard.setOutlineProvider(new android.view.ViewOutlineProvider() {
+                @Override
+                public void getOutline(android.view.View view, android.graphics.Outline outline) {
+                    outline.setRoundRect(0, 0, view.getWidth(), view.getHeight(), dp(24));
+                }
+            });
+            loginCard.setClipToOutline(true);
+        }
 
         LayoutParams cardLp = new LayoutParams(dp(280), LayoutParams.WRAP_CONTENT);
         loginCard.setLayoutParams(cardLp);
@@ -219,7 +244,7 @@ public class LoginView extends LinearLayout {
         btnBg.setColor(C_ACCENT);
         btnBg.setCornerRadius(dp(14));
         btnLogin.setBackground(btnBg);
-        btnLogin.setTextColor(Color.WHITE);
+        btnLogin.setTextColor(Color.BLACK);
         btnLogin.setLetterSpacing(0.1f);
         
         btnLogin.setOnClickListener(v -> attemptLogin());
