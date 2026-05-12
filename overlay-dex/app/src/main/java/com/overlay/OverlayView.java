@@ -881,7 +881,7 @@ public class OverlayView extends LinearLayout {
         GradientDrawable gd = new GradientDrawable();
         gd.setColor(C_CARD);
         gd.setCornerRadius(dp(16));
-        bg.setStroke(dp(1), Color.argb(100, 255, 215, 0));// Border neon tipis
+        gd.setStroke(dp(1), Color.argb(100, 255, 215, 0));// Border neon tipis
         card.setBackground(gd);
         card.setPadding(dp(20), dp(20), dp(20), dp(20));
         
