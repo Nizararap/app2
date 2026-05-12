@@ -838,45 +838,62 @@ public class OverlayView extends LinearLayout {
 
     // ==================== DRAG ====================
     private final OnTouchListener dragL = new OnTouchListener() {
-        @Override
-        public boolean onTouch(View v, MotionEvent e) {
-            boolean locked = prefs.getBoolean("ui_lock", false);
-            switch (e.getAction()) {
-                case MotionEvent.ACTION_DOWN:
-                    tx = e.getRawX(); ty = e.getRawY();
-                    ix = lp.x;       iy = lp.y;
-                    dragging = false;
-                    fetchRealScreenSize();
-                    return true;
-                case MotionEvent.ACTION_MOVE:
-                    if (locked) return true;
-                    int dx = (int)(e.getRawX() - tx);
-                    int dy = (int)(e.getRawY() - ty);
-                    if (Math.abs(dx) > 8 || Math.abs(dy) > 8) {
-                        dragging = true;
-                        int viewW = getWidth();
-                        int viewH = getHeight();
-                        float scale = prefs.getFloat("ui_scale", 1.0f);
-                        int scaledW = (int)(viewW * scale);
-                        int scaledH = (int)(viewH * scale);
-                        
-                        // Fix: Using 0 to allow moving to very edge, and properly calculate maxX/Y
-                        int maxX = realScreenW - (v == tvPill ? viewW : scaledW);
-                        int maxY = realScreenH - (v == tvPill ? viewH : scaledH);
-                        
-                        lp.x = Math.max(0, Math.min(ix + dx, maxX));
-                        lp.y = Math.max(0, Math.min(iy + dy, maxY));
-                        wm.updateViewLayout(OverlayView.this, lp);
-                    }
-                    return true;
-                case MotionEvent.ACTION_UP:
-                    if (!dragging && v == tvPill) showExpanded();
-                    else if (!dragging) v.performClick();
-                    return true;
-            }
-            return false;
+    @Override
+    public boolean onTouch(View v, MotionEvent e) {
+        boolean locked = prefs.getBoolean("ui_lock", false);
+        if (locked && e.getAction() != MotionEvent.ACTION_DOWN) return true;
+
+        switch (e.getAction()) {
+            case MotionEvent.ACTION_DOWN:
+                tx = e.getRawX(); 
+                ty = e.getRawY();
+                ix = lp.x; 
+                iy = lp.y;
+                dragging = false;
+                fetchRealScreenSize();  // refresh ukuran layar
+                return true;
+
+            case MotionEvent.ACTION_MOVE:
+                if (locked) return true;
+
+                int dx = (int)(e.getRawX() - tx);
+                int dy = (int)(e.getRawY() - ty);
+
+                if (Math.abs(dx) > 8 || Math.abs(dy) > 8) {
+                    dragging = true;
+
+                    float scale = prefs.getFloat("ui_scale", 1.0f);
+                    int viewW = getWidth();
+                    int viewH = getHeight();
+
+                    // Perbaikan perhitungan batas
+                    int scaledW = (int) (viewW * scale);
+                    int scaledH = (int) (viewH * scale);
+
+                    // Allow sticking to edge with small margin
+                    int maxX = realScreenW - scaledW;
+                    int maxY = realScreenH - scaledH;
+
+                    lp.x = Math.max(0, Math.min(ix + dx, maxX));
+                    lp.y = Math.max(0, Math.min(iy + dy, maxY));
+
+                    try { 
+                        wm.updateViewLayout(OverlayView.this, lp); 
+                    } catch (Exception ignored) {}
+                }
+                return true;
+
+            case MotionEvent.ACTION_UP:
+                if (!dragging && v == tvPill) {
+                    showExpanded();
+                } else if (!dragging) {
+                    v.performClick();
+                }
+                return true;
         }
-    };
+        return false;
+    }
+};
     
 // Interface untuk aksi dialog
     public interface DialogCallback {
