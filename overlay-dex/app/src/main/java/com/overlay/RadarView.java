@@ -30,25 +30,28 @@ public class RadarView extends View {
     private boolean isRunning = true;
     private SharedPreferences prefs;
 
-    // Cache untuk gambar yang sudah diproses & di-resize
+    // 1. DATABASE MENTAH: Menyimpan file PNG/WEBP dalam bentuk byte (Sangat ringan di RAM, memuat 129 hero)
+    private Map<String, byte[]> rawImageBytes = new HashMap<>();
+
+    // 2. CACHE AKTIF: Hanya menyimpan Bitmap hero yang SEDANG dipakai di match ini (Maksimal 10 Hero)
+    private Map<String, Bitmap> activeHeroBitmaps = new HashMap<>();
+
+    // 3. CACHE RADAR: Menyimpan Bitmap yang sudah di-resize & dibulatkan
     private Map<String, Bitmap> heroIconCache = new HashMap<>();
     private float currentIconSize = 0f;
 
-    // Cache mentahan gambar original (Hanya disimpan sekali di RAM)
-    private Map<String, Bitmap> preloadedIcons = new HashMap<>();
+    // 4. CACHE STRING: Agar tidak membuat object String terus menerus (Anti Patah-Patah)
+    private Map<Integer, String> stringCache = new HashMap<>();
 
     private PlayerInfo[] playerPool = new PlayerInfo[20]; 
 
     private static class PlayerInfo {
-        int entityId;     // <--- TAMBAHAN BARU
+        int entityId;     
         float x, y, z;
         int campType;
         String heroName;
     }
     
-    // <--- TAMBAHAN BARU: Cache agar tidak membuat String terus-menerus
-    private Map<Integer, String> stringCache = new HashMap<>();
-
     private Bitmap getCircularBitmap(Bitmap bitmap) {
         Bitmap output = Bitmap.createBitmap(bitmap.getWidth(), bitmap.getHeight(), Bitmap.Config.ARGB_8888);
         Canvas canvas = new Canvas(output);
@@ -70,17 +73,16 @@ public class RadarView extends View {
             playerPool[i] = new PlayerInfo();
         }
         
-        // Load & Decrypt heroes.bin SATU KALI saat pertama kali radar muncul
         loadAndDecryptHeroes(); 
-        
         initPaints();
         startSocketThread();
     }
 
-    // FUNGSI BARU: Ekstrak heroes.bin dari memori
+    // =========================================================================
+    // PERBAIKAN: HANYA SIMPAN BYTE[], JANGAN DI-DECODE JADI BITMAP DULU!
+    // =========================================================================
     private void loadAndDecryptHeroes() {
         try {
-            // Baca file tunggal heroes.bin dari folder assets
             InputStream is = getContext().getAssets().open("assets.dat");
             ByteArrayOutputStream buffer = new ByteArrayOutputStream();
             int nRead;
@@ -92,13 +94,11 @@ public class RadarView extends View {
             byte[] encryptedBytes = buffer.toByteArray();
             is.close();
 
-            // 1. DEKRIPSI (XOR dengan kunci 0x5B)
             byte key = 0x5B;
             for (int i = 0; i < encryptedBytes.length; i++) {
                 encryptedBytes[i] ^= key;
             }
 
-            // 2. UNZIP DARI MEMORI RAM
             ByteArrayInputStream bais = new ByteArrayInputStream(encryptedBytes);
             ZipInputStream zis = new ZipInputStream(bais);
             ZipEntry entry;
@@ -106,16 +106,22 @@ public class RadarView extends View {
             while ((entry = zis.getNextEntry()) != null) {
                 String name = entry.getName().toLowerCase();
                 if (name.endsWith(".png") || name.endsWith(".webp")) {
-                    // Decode PNG/WEBP yang ada di dalam ZIP
-                    Bitmap bmp = BitmapFactory.decodeStream(zis);
-                    if (bmp != null) {
-                        // Kunci pencarian: hilangkan ekstensi, jadikan huruf kecil, buang spasi
-                        String searchKey = entry.getName()
-                                .replace(".png", "")
-                                .replace(".webp", "")
-                                .toLowerCase().replaceAll("[^a-z0-9]", "");
-                        preloadedIcons.put(searchKey, bmp); // Simpan mentahannya di RAM
+                    
+                    // Baca isi file menjadi byte array mentah
+                    ByteArrayOutputStream byteOut = new ByteArrayOutputStream();
+                    byte[] tmp = new byte[2048];
+                    int len;
+                    while ((len = zis.read(tmp)) > 0) {
+                        byteOut.write(tmp, 0, len);
                     }
+                    
+                    String searchKey = entry.getName()
+                            .replace(".png", "")
+                            .replace(".webp", "")
+                            .toLowerCase().replaceAll("[^a-z0-9]", "");
+                    
+                    // Simpan byte mentah ke RAM (Bukan Bitmap!)
+                    rawImageBytes.put(searchKey, byteOut.toByteArray()); 
                 }
                 zis.closeEntry();
             }
@@ -128,13 +134,13 @@ public class RadarView extends View {
 
     private void initPaints() {
         borderPaint = new Paint();
-        borderPaint.setColor(Color.argb(120, 255, 215, 0)); // Semi-transparent Gold
+        borderPaint.setColor(Color.argb(120, 255, 215, 0));
         borderPaint.setStyle(Paint.Style.STROKE);
-        borderPaint.setStrokeWidth(2f); // Thinner border
+        borderPaint.setStrokeWidth(2f);
         borderPaint.setAntiAlias(true);
 
         enemyPaint = new Paint();
-        enemyPaint.setColor(Color.argb(200, 255, 45, 85)); // Modern Red/Pink
+        enemyPaint.setColor(Color.argb(200, 255, 45, 85));
         enemyPaint.setStyle(Paint.Style.FILL);
         enemyPaint.setAntiAlias(true);
 
@@ -146,28 +152,46 @@ public class RadarView extends View {
         textPaint.setAntiAlias(true);
     }
 
+    // =========================================================================
+    // LAZY LOADING (Hanya merubah byte -> Bitmap jika hero muncul di match)
+    // =========================================================================
+    private Bitmap getOriginalBitmapLazy(String key) {
+        // Jika sudah ada di cache RAM aktif (sedang dipakai di match ini), langsung return
+        if (activeHeroBitmaps.containsKey(key)) {
+            return activeHeroBitmaps.get(key);
+        }
+        
+        // Jika belum ada, tapi byte[] nya kita punya, DECODE SEKARANG
+        if (rawImageBytes.containsKey(key)) {
+            byte[] imgData = rawImageBytes.get(key);
+            Bitmap bmp = BitmapFactory.decodeByteArray(imgData, 0, imgData.length);
+            if (bmp != null) {
+                activeHeroBitmaps.put(key, bmp); // Simpan ke cache aktif agar tidak di-decode ulang
+                return bmp;
+            }
+        }
+        return null; // Gambar tidak ditemukan
+    }
+
     private Bitmap getHeroIcon(String heroName, float targetSize) {
         String searchKey = heroName.toLowerCase().replaceAll("[^a-z0-9]", "");
         
-        // Jika ukuran icon berubah (user geser slider), bersihkan cache bulatan
         if (currentIconSize != targetSize) {
             heroIconCache.clear();
             currentIconSize = targetSize;
         }
 
-        // Ambil icon bulat dari cache jika sudah ada
         if (heroIconCache.containsKey(searchKey)) {
             return heroIconCache.get(searchKey);
         }
 
-        // Ambil gambar mentah dari memori preloaded
-        Bitmap originalBmp = preloadedIcons.get(searchKey);
+        // Ambil gambar original lewat metode Lazy Loading
+        Bitmap originalBmp = getOriginalBitmapLazy(searchKey);
         if (originalBmp == null) {
             heroIconCache.put(searchKey, null);
             return null;
         }
 
-        // Proses resize dan buat bulat (hanya 1x per hero)
         int size = (int) targetSize;
         if (size <= 0) size = 50;
         Bitmap scaledBmp = Bitmap.createScaledBitmap(originalBmp, size, size, true);
@@ -188,7 +212,7 @@ public class RadarView extends View {
                     dis = new DataInputStream(socket.getInputStream());
 
                     byte[] countBuffer = new byte[4];
-                    byte[] packetBuffer = new byte[52]; // <--- UBAH DARI 48 JADI 52
+                    byte[] packetBuffer = new byte[52]; 
 
                     while (isRunning) {
                         dis.readFully(countBuffer);
@@ -196,32 +220,40 @@ public class RadarView extends View {
 
                         if (playerCount > 20 || playerCount < 0) playerCount = 0; 
 
+                        // =========================================================================
+                        // PERBAIKAN MEMORY LEAK: BERSAHKAN CACHE SAAT MATCH SELESAI (DI LOBY)
+                        // =========================================================================
+                        if (playerCount == 0) {
+                            if (!stringCache.isEmpty()) {
+                                stringCache.clear();       // Bersihkan String Entity ID
+                                heroIconCache.clear();     // Bersihkan Icon Radar yang sudah di-resize
+                                activeHeroBitmaps.clear(); // Bersihkan Bitmap Hero Match Sebelumnya
+                                // Catatan: rawImageBytes JANGAN dibersihkan karena kita butuh untuk match selanjutnya!
+                            }
+                        }
+
                         List<PlayerInfo> newPlayers = new ArrayList<>(playerCount);
                         for (int i = 0; i < playerCount; i++) {
                             dis.readFully(packetBuffer);
                             ByteBuffer bb = ByteBuffer.wrap(packetBuffer).order(ByteOrder.LITTLE_ENDIAN);
 
                             PlayerInfo p = playerPool[i]; 
-                            p.entityId = bb.getInt(); // <--- TAMBAHAN BARU BACA ID
+                            p.entityId = bb.getInt(); 
                             p.x = bb.getFloat();
                             p.y = bb.getFloat();
                             p.z = bb.getFloat();
                             p.campType = bb.getInt();
 
-                            // <--- LOGIKA ANTI LAG MULAI DI SINI --->
                             if (stringCache.containsKey(p.entityId)) {
-                                // Jika nama sudah ada di memori, lewati proses convert String (Hemat RAM!)
                                 bb.position(bb.position() + 32); 
                                 p.heroName = stringCache.get(p.entityId);
                             } else {
-                                // Jika hero baru muncul, baru convert String dan simpan ke Cache
                                 byte[] nameBytes = new byte[32];
                                 bb.get(nameBytes);
                                 String name = new String(nameBytes).trim();
                                 stringCache.put(p.entityId, name);
                                 p.heroName = name;
                             }
-                            // <--- LOGIKA ANTI LAG SELESAI --->
 
                             newPlayers.add(p);
                         }
@@ -234,7 +266,6 @@ public class RadarView extends View {
                 } catch (Exception e) {
                     try { Thread.sleep(1000); } catch (InterruptedException ignored) {}
                 } finally {
-                    // PENTING: Wajib menutup socket di blok finally agar tidak terjadi Memory/FD Leak!
                     try { if (dis != null) dis.close(); } catch (Exception ignored) {}
                     try { if (socket != null) socket.close(); } catch (Exception ignored) {}
                 }
@@ -313,12 +344,9 @@ public class RadarView extends View {
         return names;
     }
 
-    // Fungsi untuk meminjam icon mentah dari cache RAM
+    // Fungsi dipanggil oleh OverlayView (Menu Room Info / Draft Pick)
     public Bitmap getRawIcon(String key) {
-        if (preloadedIcons != null && preloadedIcons.containsKey(key)) {
-            return preloadedIcons.get(key);
-        }
-        return null;
+        return getOriginalBitmapLazy(key);
     }
 
     public void destroy() { isRunning = false; }

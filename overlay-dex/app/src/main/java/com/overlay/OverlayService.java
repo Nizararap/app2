@@ -33,7 +33,8 @@ public class OverlayService extends Service {
     private boolean isLoggedOut = false;
     
     private static final int RETRY_DELAY_MS = 2000;
-    private static final long KEY_CHECK_INTERVAL_MS = 10 * 60 * 1000; // 10 menit (ubah jadi 60*60*1000 untuk 1 jam)
+    // Rekomendasi: 2 Jam (Sangat aman dari limit GitHub, performa tetap adem, dan kalau ada user nakal gak kelamaan main gratisnya)
+private static final long KEY_CHECK_INTERVAL_MS = 2 * 60 * 60 * 1000L;
     private long lastKeyCheckTime = 0;
 
     @Override
