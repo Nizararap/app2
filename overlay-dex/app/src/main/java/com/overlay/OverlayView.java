@@ -90,27 +90,61 @@ public class OverlayView extends LinearLayout {
 
     private void buildPill(Context ctx) {
         tvPill = new TextView(ctx);
-        tvPill.setText("M");
-        tvPill.setTextColor(Color.BLACK);
-        tvPill.setTextSize(14f);
-        tvPill.setTypeface(null, Typeface.BOLD);
-        tvPill.setGravity(Gravity.CENTER);
-        tvPill.setPadding(dp(12), dp(12), dp(12), dp(12));
-        
-        GradientDrawable bg = new GradientDrawable();
-        bg.setShape(GradientDrawable.OVAL);
-        bg.setColors(new int[]{C_ACCENT, Color.parseColor("#8B7500")});
-        bg.setOrientation(GradientDrawable.Orientation.TL_BR);
-        bg.setStroke(dp(1), Color.argb(150, 255, 255, 255));
-        
-        tvPill.setBackground(bg);
-        tvPill.setElevation(dp(6));
-        tvPill.setOnTouchListener(dragL);
-        
-        LayoutParams pillLp = new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
-        tvPill.setLayoutParams(pillLp);
-        
-        addView(tvPill);
+tvPill.setGravity(Gravity.CENTER);
+
+try {
+    android.graphics.Bitmap bmp = android.graphics.BitmapFactory.decodeStream(
+        ctx.getAssets().open("background.jpg"));
+    if (bmp != null) {
+        // Crop jadi kotak tengah dulu biar hasilnya bulat sempurna
+        int size = Math.min(bmp.getWidth(), bmp.getHeight());
+        int x = (bmp.getWidth() - size) / 2;
+        int y = (bmp.getHeight() - size) / 2;
+        android.graphics.Bitmap cropped = android.graphics.Bitmap.createBitmap(bmp, x, y, size, size);
+
+        // Scale ke ukuran pill
+        int pillSize = dp(44);
+        android.graphics.Bitmap scaled = android.graphics.Bitmap.createScaledBitmap(cropped, pillSize, pillSize, true);
+
+        // Buat circular bitmap
+        android.graphics.Bitmap circle = android.graphics.Bitmap.createBitmap(pillSize, pillSize, android.graphics.Bitmap.Config.ARGB_8888);
+        android.graphics.Canvas canvas = new android.graphics.Canvas(circle);
+        android.graphics.Paint paint = new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
+        canvas.drawCircle(pillSize / 2f, pillSize / 2f, pillSize / 2f, paint);
+        paint.setXfermode(new android.graphics.PorterDuffXfermode(android.graphics.PorterDuff.Mode.SRC_IN));
+        canvas.drawBitmap(scaled, 0, 0, paint);
+
+        // Dark overlay biar keliatan gelap/hitam
+        paint.setXfermode(null);
+        paint.setColor(Color.argb(160, 0, 0, 0));
+        canvas.drawCircle(pillSize / 2f, pillSize / 2f, pillSize / 2f, paint);
+
+        android.graphics.drawable.BitmapDrawable bd = new android.graphics.drawable.BitmapDrawable(ctx.getResources(), circle);
+        bd.setGravity(Gravity.CENTER);
+        tvPill.setBackground(bd);
+        tvPill.setPadding(0, 0, 0, 0);
+    }
+} catch (Exception e) {
+    // Fallback ke gold gradient jika gambar tidak ada
+    GradientDrawable bg = new GradientDrawable();
+    bg.setShape(GradientDrawable.OVAL);
+    bg.setColors(new int[]{C_ACCENT, Color.parseColor("#8B7500")});
+    bg.setOrientation(GradientDrawable.Orientation.TL_BR);
+    tvPill.setBackground(bg);
+    tvPill.setText("M");
+    tvPill.setTextColor(Color.BLACK);
+    tvPill.setTextSize(14f);
+    tvPill.setTypeface(null, Typeface.BOLD);
+    tvPill.setPadding(dp(12), dp(12), dp(12), dp(12));
+}
+
+tvPill.setElevation(dp(6));
+tvPill.setOnTouchListener(dragL);
+
+LayoutParams pillLp = new LayoutParams(dp(44), dp(44));
+tvPill.setLayoutParams(pillLp);
+
+addView(tvPill);
     }
 
     private void buildPanel(Context ctx) {
@@ -913,7 +947,7 @@ public class OverlayView extends LinearLayout {
     private String formatTime(long seconds) {
         if (seconds <= 0) return "Expired";
         if (seconds > 86400) return (seconds / 86400) + " Day";
-        if (seconds > 3600) return (seconds / 3600) + " ..";
+        if (seconds > 3600) return (seconds / 3600) + "";
         return (seconds / 60) + " Minute";
     }
 

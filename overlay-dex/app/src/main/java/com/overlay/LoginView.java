@@ -148,11 +148,18 @@ public class LoginView extends LinearLayout {
         header.addView(title);
 
         TextView sub = new TextView(ctx);
-        sub.setText("BETA ACCESS");
-        sub.setTextColor(C_ACCENT);
-        sub.setTextSize(10f);
-        sub.setLetterSpacing(0.2f);
-        header.addView(sub);
+sub.setText("BETA ACCESS");
+sub.setTextColor(C_ACCENT);
+sub.setTextSize(10f);
+sub.setLetterSpacing(0.2f);
+header.addView(sub);
+
+TextView minBtn = new TextView(ctx);
+minBtn.setText("─");
+minBtn.setTextColor(C_SUBTEXT);
+minBtn.setPadding(dp(10), dp(8), dp(10), dp(8));
+minBtn.setOnClickListener(v -> showCollapsed());
+header.addView(minBtn);
         
         loginCard.addView(header);
 
