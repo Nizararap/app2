@@ -134,26 +134,37 @@ public class LoginView extends LinearLayout {
         loginCard.setLayoutParams(cardLp);
 
         // Header
-        LinearLayout header = new LinearLayout(ctx);
-        header.setOrientation(VERTICAL);
-        header.setGravity(Gravity.CENTER_HORIZONTAL);
-        header.setPadding(0, 0, 0, dp(20));
-        
-        TextView title = new TextView(ctx);
-        title.setText("MONDEV");
-        title.setTextColor(C_TEXT);
-        title.setTextSize(22f);
-        title.setLetterSpacing(0.1f);
-        title.setTypeface(Typeface.create("sans-serif-black", Typeface.BOLD));
-        header.addView(title);
+        // Ubah header menjadi horizontal
+LinearLayout header = new LinearLayout(ctx);
+header.setOrientation(HORIZONTAL);           // ← HORIZONTAL
+header.setGravity(Gravity.CENTER_VERTICAL);  // vertikal center
+header.setPadding(0, 0, dp(10), dp(20));     // padding kanan untuk tombol
 
-        TextView sub = new TextView(ctx);
+// Panel kiri (berisi title dan sub secara vertikal)
+LinearLayout leftPanel = new LinearLayout(ctx);
+leftPanel.setOrientation(VERTICAL);
+leftPanel.setGravity(Gravity.START);
+LinearLayout.LayoutParams leftLp = new LinearLayout.LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f);
+leftPanel.setLayoutParams(leftLp);
+
+TextView title = new TextView(ctx);
+title.setText("MONDEV");
+title.setTextColor(C_TEXT);
+title.setTextSize(22f);
+title.setLetterSpacing(0.1f);
+title.setTypeface(Typeface.create("sans-serif-black", Typeface.BOLD));
+leftPanel.addView(title);
+
+TextView sub = new TextView(ctx);
 sub.setText("BETA ACCESS");
 sub.setTextColor(C_ACCENT);
 sub.setTextSize(10f);
 sub.setLetterSpacing(0.2f);
-header.addView(sub);
+leftPanel.addView(sub);
 
+header.addView(leftPanel);
+
+// Tombol minimasi di pojok kanan
 TextView minBtn = new TextView(ctx);
 minBtn.setText("─");
 minBtn.setTextColor(C_SUBTEXT);

@@ -89,53 +89,59 @@ public class OverlayView extends LinearLayout {
     }
 
     private void buildPill(Context ctx) {
-        tvPill = new TextView(ctx);
-tvPill.setGravity(Gravity.CENTER);
+    tvPill = new TextView(ctx);
+    tvPill.setGravity(Gravity.CENTER);
 
-try {
-    android.graphics.Bitmap bmp = android.graphics.BitmapFactory.decodeStream(
-        ctx.getAssets().open("background.jpg"));
-    if (bmp != null) {
-        // Crop jadi kotak tengah dulu biar hasilnya bulat sempurna
-        int size = Math.min(bmp.getWidth(), bmp.getHeight());
-        int x = (bmp.getWidth() - size) / 2;
-        int y = (bmp.getHeight() - size) / 2;
-        android.graphics.Bitmap cropped = android.graphics.Bitmap.createBitmap(bmp, x, y, size, size);
-
-        // Scale ke ukuran pill
-        int pillSize = dp(44);
-        android.graphics.Bitmap scaled = android.graphics.Bitmap.createScaledBitmap(cropped, pillSize, pillSize, true);
-
-        // Buat circular bitmap
-        android.graphics.Bitmap circle = android.graphics.Bitmap.createBitmap(pillSize, pillSize, android.graphics.Bitmap.Config.ARGB_8888);
-        android.graphics.Canvas canvas = new android.graphics.Canvas(circle);
-        android.graphics.Paint paint = new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
-        canvas.drawCircle(pillSize / 2f, pillSize / 2f, pillSize / 2f, paint);
-        paint.setXfermode(new android.graphics.PorterDuffXfermode(android.graphics.PorterDuff.Mode.SRC_IN));
-        canvas.drawBitmap(scaled, 0, 0, paint);
-
-        // Dark overlay biar keliatan gelap/hitam
-        paint.setXfermode(null);
-        paint.setColor(Color.argb(160, 0, 0, 0));
-        canvas.drawCircle(pillSize / 2f, pillSize / 2f, pillSize / 2f, paint);
-
-        android.graphics.drawable.BitmapDrawable bd = new android.graphics.drawable.BitmapDrawable(ctx.getResources(), circle);
-        bd.setGravity(Gravity.CENTER);
-        tvPill.setBackground(bd);
-        tvPill.setPadding(0, 0, 0, 0);
+    try {
+        android.graphics.Bitmap bmp = android.graphics.BitmapFactory.decodeStream(
+            ctx.getAssets().open("background2.jpg")); // ganti nama file sesuai keinginan
+        if (bmp != null) {
+            int pillSize = dp(44);
+            int w = bmp.getWidth();
+            int h = bmp.getHeight();
+            float scale = Math.min((float) pillSize / w, (float) pillSize / h);
+            int newW = Math.round(w * scale);
+            int newH = Math.round(h * scale);
+            // Scale bitmap proporsional
+            android.graphics.Bitmap scaled = android.graphics.Bitmap.createScaledBitmap(bmp, newW, newH, true);
+            
+            // Buat canvas lingkaran ukuran pill
+            android.graphics.Bitmap circle = android.graphics.Bitmap.createBitmap(pillSize, pillSize, android.graphics.Bitmap.Config.ARGB_8888);
+            android.graphics.Canvas canvas = new android.graphics.Canvas(circle);
+            android.graphics.Paint paint = new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
+            
+            // Gambar lingkaran (sebagai mask)
+            canvas.drawCircle(pillSize / 2f, pillSize / 2f, pillSize / 2f, paint);
+            paint.setXfermode(new android.graphics.PorterDuffXfermode(android.graphics.PorterDuff.Mode.SRC_IN));
+            
+            // Gambar bitmap di tengah
+            int left = (pillSize - newW) / 2;
+            int top = (pillSize - newH) / 2;
+            canvas.drawBitmap(scaled, left, top, paint);
+            
+            // (Opsional) overlay gelap jika ingin
+            paint.setXfermode(null);
+            paint.setColor(Color.argb(160, 0, 0, 0));
+            canvas.drawCircle(pillSize / 2f, pillSize / 2f, pillSize / 2f, paint);
+            
+            android.graphics.drawable.BitmapDrawable bd = new android.graphics.drawable.BitmapDrawable(ctx.getResources(), circle);
+            bd.setGravity(Gravity.CENTER);
+            tvPill.setBackground(bd);
+            tvPill.setPadding(0, 0, 0, 0);
+        }
+    } catch (Exception e) {
+        // fallback gradient gold
+        GradientDrawable bg = new GradientDrawable();
+        bg.setShape(GradientDrawable.OVAL);
+        bg.setColors(new int[]{C_ACCENT, Color.parseColor("#8B7500")});
+        bg.setOrientation(GradientDrawable.Orientation.TL_BR);
+        tvPill.setBackground(bg);
+        tvPill.setText("M");
+        tvPill.setTextColor(Color.BLACK);
+        tvPill.setTextSize(14f);
+        tvPill.setTypeface(null, Typeface.BOLD);
+        tvPill.setPadding(dp(12), dp(12), dp(12), dp(12));
     }
-} catch (Exception e) {
-    // Fallback ke gold gradient jika gambar tidak ada
-    GradientDrawable bg = new GradientDrawable();
-    bg.setShape(GradientDrawable.OVAL);
-    bg.setColors(new int[]{C_ACCENT, Color.parseColor("#8B7500")});
-    bg.setOrientation(GradientDrawable.Orientation.TL_BR);
-    tvPill.setBackground(bg);
-    tvPill.setText("M");
-    tvPill.setTextColor(Color.BLACK);
-    tvPill.setTextSize(14f);
-    tvPill.setTypeface(null, Typeface.BOLD);
-    tvPill.setPadding(dp(12), dp(12), dp(12), dp(12));
 }
 
 tvPill.setElevation(dp(6));

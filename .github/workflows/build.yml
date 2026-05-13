@@ -62,9 +62,9 @@ jobs:
           import os, zipfile, io
           
           key = 0x5B # KUNCI RAHASIA
-          hero_dir = 'heroes'
+          hero_dir = 'Assets'
           out_dir = 'output_artifact'
-          out_file = os.path.join(out_dir, 'heroes.bin')
+          out_file = os.path.join(out_dir, 'Assets.dat')
           
           if os.path.exists(hero_dir):
               # Buat file ZIP sementara di memori (RAM)
