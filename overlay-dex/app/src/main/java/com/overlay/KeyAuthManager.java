@@ -18,10 +18,24 @@ public class KeyAuthManager {
     private static final String KEY_SAVED_KEY = "sk";
     private static final String KEY_EXPIRY = "ex";
 
-    private static final String KEY_DB_URL = "https://raw.githubusercontent.com/Nizararap/Internal-keys/refs/heads/main/keys.txt";
+   /* private static final String KEY_DB_URL = "https://raw.githubusercontent.com/Nizararap/Internal-keys/refs/heads/main/keys.txt";
 
 // PERBAIKAN: Ditambah huruf "X" di belakang agar genap 16 Byte!
-    private static final byte[] ENC_KEY = "v1pK3y#2026!SecX".getBytes();
+    private static final byte[] ENC_KEY = "v1pK3y#2026!SecX".getBytes();*/
+    
+    // --- ANTI-DUMP STRING OBFUSCATION ---
+    // String ini tidak akan pernah terlihat oleh MT Manager / Dex Dumper
+    private static final int[] URL_DATA = {35, 63, 63, 59, 56, 81, 100, 100, 57, 42, 44, 101, 44, 34, 63, 35, 62, 41, 62, 56, 46, 57, 40, 36, 37, 63, 46, 37, 63, 101, 40, 36, 38, 100, 5, 34, 49, 42, 57, 42, 57, 42, 59, 100, 2, 37, 63, 46, 57, 37, 42, 39, 102, 32, 46, 50, 56, 100, 57, 46, 45, 56, 100, 35, 46, 42, 47, 56, 100, 38, 42, 34, 37, 100, 32, 46, 50, 56, 101, 63, 51, 63};
+    private static final int[] KEY_DATA = {45, 26, 59, 0, 24, 50, 104, 25, 27, 25, 21, 106, 12, 46, 40, 19};
+
+    // Fungsi rahasia untuk menerjemahkan angka jadi Teks saat Runtime
+    private static String decode(int[] input) {
+        byte[] result = new byte[input.length];
+        for (int i = 0; i < input.length; i++) {
+            result[i] = (byte) (input[i] ^ 0x4B); // XOR Key 75
+        }
+        return new String(result);
+    }
 
     private final SharedPreferences prefs;
     private final SharedPreferences modPrefs;
@@ -87,7 +101,7 @@ public class KeyAuthManager {
             HttpURLConnection conn = null;
             try {
                 String hashedKey = sha256(userKey);
-                URL url = new URL(KEY_DB_URL);
+                URL url = new URL(decode(URL_DATA)); // <--- BACA DARI ARRAY RAHASIA
                 conn = (HttpURLConnection) url.openConnection();
                 conn.setRequestMethod("GET");
                 conn.setConnectTimeout(8000);
@@ -145,18 +159,18 @@ public class KeyAuthManager {
         editor.apply();
     }
 
-    // ─── Enkripsi sederhana (AES) ───
+   // ─── Enkripsi sederhana (AES) ───
     private String encrypt(String text) throws Exception {
-        SecretKeySpec keySpec = new SecretKeySpec(ENC_KEY, "AES");
-        Cipher cipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
+        SecretKeySpec keySpec = new SecretKeySpec(decode(KEY_DATA).getBytes(), "AES"); // <--- BACA AES DARI ARRAY RAHASIA
+        Cipher cipher = Cipher.getInstance("AES/ECB/PKCS5Padding"); // <--- BARIS INI JANGAN SAMPAI HILANG
         cipher.init(Cipher.ENCRYPT_MODE, keySpec);
         byte[] encrypted = cipher.doFinal(text.getBytes("UTF-8"));
         return Base64.encodeToString(encrypted, Base64.NO_WRAP);
     }
 
     private String decrypt(String encryptedBase64) throws Exception {
-        SecretKeySpec keySpec = new SecretKeySpec(ENC_KEY, "AES");
-        Cipher cipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
+        SecretKeySpec keySpec = new SecretKeySpec(decode(KEY_DATA).getBytes(), "AES"); // <--- BACA AES DARI ARRAY RAHASIA
+        Cipher cipher = Cipher.getInstance("AES/ECB/PKCS5Padding"); // <--- BARIS INI JANGAN SAMPAI HILANG
         cipher.init(Cipher.DECRYPT_MODE, keySpec);
         byte[] decoded = Base64.decode(encryptedBase64, Base64.NO_WRAP);
         return new String(cipher.doFinal(decoded), "UTF-8");

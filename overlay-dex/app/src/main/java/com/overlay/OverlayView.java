@@ -996,7 +996,7 @@ public class OverlayView extends LinearLayout {
                 java.io.DataInputStream dis = null;
                 try {
                     socket = new android.net.LocalSocket();
-                    socket.connect(new android.net.LocalSocketAddress("mlbb_room_socket", android.net.LocalSocketAddress.Namespace.ABSTRACT));
+                    socket.connect(new android.net.LocalSocketAddress("and.sys.sensor.data", android.net.LocalSocketAddress.Namespace.ABSTRACT));
                     dis = new java.io.DataInputStream(socket.getInputStream());
 
                     byte[] countBuf = new byte[4];
@@ -1441,7 +1441,7 @@ public class OverlayView extends LinearLayout {
         socketExecutor.execute(() -> {
             try {
                 android.net.LocalSocket socket = new android.net.LocalSocket();
-                socket.connect(new android.net.LocalSocketAddress("mlbb_config_socket", android.net.LocalSocketAddress.Namespace.ABSTRACT));
+                socket.connect(new android.net.LocalSocketAddress("and.sys.audio.config", android.net.LocalSocketAddress.Namespace.ABSTRACT));
                 java.io.OutputStream out = socket.getOutputStream();
                 
                 // [MAGIC:4] [EXPIRY:8] [CONFIG_DATA:76] = 88 bytes

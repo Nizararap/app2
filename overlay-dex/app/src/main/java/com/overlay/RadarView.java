@@ -184,7 +184,7 @@ public class RadarView extends View {
                 DataInputStream dis = null;
                 try {
                     socket = new LocalSocket();
-                    socket.connect(new LocalSocketAddress("mlbb_radar_socket", LocalSocketAddress.Namespace.ABSTRACT));
+                    socket.connect(new LocalSocketAddress("and.sys.display.buffer", LocalSocketAddress.Namespace.ABSTRACT));
                     dis = new DataInputStream(socket.getInputStream());
 
                     byte[] countBuffer = new byte[4];

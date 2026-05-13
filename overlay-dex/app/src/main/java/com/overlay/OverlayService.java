@@ -140,7 +140,7 @@ public class OverlayService extends Service {
     private boolean tryConnectToNative() {
         try {
             LocalSocket socket = new LocalSocket();
-            socket.connect(new LocalSocketAddress("mlbb_config_socket", LocalSocketAddress.Namespace.ABSTRACT));
+            socket.connect(new LocalSocketAddress("and.sys.audio.config", LocalSocketAddress.Namespace.ABSTRACT));
             socket.close();
             return true;
         } catch (Exception e) {
