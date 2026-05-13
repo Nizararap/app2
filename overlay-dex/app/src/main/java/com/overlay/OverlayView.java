@@ -1,7 +1,9 @@
 package com.overlay;
 
 import android.content.Context;
+import android.content.Intent;
 import android.content.SharedPreferences;
+import android.net.Uri;
 import android.graphics.Color;
 import android.graphics.PixelFormat;
 import android.graphics.Typeface;
@@ -24,16 +26,16 @@ import android.widget.TextView;
 
 public class OverlayView extends LinearLayout {
 
-    // Modern Glassmorphism Palette - MONDEV Edition
-    private static final int C_BG      = Color.argb(210, 10, 10, 15);
-    private static final int C_CARD    = Color.argb(160, 25, 25, 35);
-    private static final int C_HEADER  = Color.argb(240, 5, 5, 10);
+    // MONDEV Palette
+    private static final int C_BG      = Color.argb(220, 10, 10, 15);
+    private static final int C_CARD    = Color.argb(170, 20, 20, 30);
+    private static final int C_HEADER  = Color.argb(245, 5, 5, 10);
     private static final int C_ACCENT  = Color.parseColor("#D4AF37"); // Muted Gold
-    private static final int C_TELEGRAM = Color.parseColor("#0088cc");
+    private static final int C_TELEGRAM = Color.parseColor("#0088cc"); // Telegram Blue
     private static final int C_TEXT    = Color.parseColor("#FFFFFF");
-    private static final int C_SUBTEXT = Color.parseColor("#D4AF37");
-    private static final int C_DIVIDER = Color.argb(80, 212, 175, 55);
-    private static final int C_BTN_DRK = Color.argb(180, 20, 20, 30);
+    private static final int C_SUBTEXT = Color.parseColor("#A0A0A0"); // Gray subtext
+    private static final int C_DIVIDER = Color.argb(60, 212, 175, 55); // Muted Gold divider
+    private static final int C_BTN_DRK = Color.argb(200, 30, 30, 45);
 
     private final WindowManager wm;
     private final WindowManager.LayoutParams lp;
@@ -56,8 +58,6 @@ public class OverlayView extends LinearLayout {
     private TextView[] tabBtns;
     private ScrollView scrollView;
     private LinearLayout tabRoom;
-    private LinearLayout roomTableContainer;
-    private boolean isRoomSocketRunning = false;
 
     public OverlayView(Context ctx, WindowManager wm, WindowManager.LayoutParams lp, RadarView radar) {
         super(ctx);
@@ -73,7 +73,6 @@ public class OverlayView extends LinearLayout {
         buildPanel(ctx);
         showExpanded();
         sendConfigToCpp(this.prefs);
-        
     }
 
     @SuppressWarnings("deprecation")
@@ -96,16 +95,16 @@ public class OverlayView extends LinearLayout {
         tvPill.setTextSize(14f);
         tvPill.setTypeface(null, Typeface.BOLD);
         tvPill.setGravity(Gravity.CENTER);
-        tvPill.setPadding(dp(10), dp(10), dp(10), dp(10));
+        tvPill.setPadding(dp(12), dp(12), dp(12), dp(12));
         
         GradientDrawable bg = new GradientDrawable();
         bg.setShape(GradientDrawable.OVAL);
-        bg.setColors(new int[]{C_ACCENT, Color.parseColor("#B8860B")});
+        bg.setColors(new int[]{C_ACCENT, Color.parseColor("#8B7500")});
         bg.setOrientation(GradientDrawable.Orientation.TL_BR);
-        bg.setStroke(dp(1), Color.argb(200, 255, 255, 255));
+        bg.setStroke(dp(1), Color.argb(150, 255, 255, 255));
         
         tvPill.setBackground(bg);
-        tvPill.setElevation(dp(4));
+        tvPill.setElevation(dp(6));
         tvPill.setOnTouchListener(dragL);
         
         LayoutParams pillLp = new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
@@ -118,17 +117,25 @@ public class OverlayView extends LinearLayout {
         panel = new LinearLayout(ctx);
         panel.setOrientation(VERTICAL);
         
+        // --- 🟢 UBAH BAGIAN INI 🟢 ---
+        // WRAP_CONTENT = Otomatis menyesuaikan isi konten
         LayoutParams panelLp = new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
         panel.setLayoutParams(panelLp);
-        panel.setMinimumWidth(dp(330));
+        
+        // Beri batas minimum agar saat di Tab Dashboard tidak terlalu kurus
+        panel.setMinimumWidth(dp(340)); 
+        // ------------------------------
 
+        // Background with Image
         try {
             android.graphics.Bitmap bmp = android.graphics.BitmapFactory.decodeStream(ctx.getAssets().open("background.jpg"));
             if (bmp != null) {
+                // Add a dark overlay on top of the image
                 android.graphics.Bitmap overlay = android.graphics.Bitmap.createBitmap(bmp.getWidth(), bmp.getHeight(), bmp.getConfig());
                 android.graphics.Canvas canvas = new android.graphics.Canvas(overlay);
                 canvas.drawBitmap(bmp, 0, 0, null);
-                canvas.drawColor(Color.argb(180, 0, 0, 0));
+                canvas.drawColor(Color.argb(200, 0, 0, 0)); // Dark overlay
+                
                 android.graphics.drawable.BitmapDrawable bd = new android.graphics.drawable.BitmapDrawable(ctx.getResources(), overlay);
                 panel.setBackground(bd);
             } else {
@@ -137,16 +144,17 @@ public class OverlayView extends LinearLayout {
         } catch (Exception e) {
             GradientDrawable bg = new GradientDrawable();
             bg.setColor(C_BG);
-            bg.setCornerRadius(dp(22));
+            bg.setCornerRadius(dp(20));
             bg.setStroke(dp(1), C_ACCENT);
             panel.setBackground(bg);
         }
 
+        // Clip to rounded corners
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
             panel.setOutlineProvider(new android.view.ViewOutlineProvider() {
                 @Override
                 public void getOutline(android.view.View view, android.graphics.Outline outline) {
-                    outline.setRoundRect(0, 0, view.getWidth(), view.getHeight(), dp(22));
+                    outline.setRoundRect(0, 0, view.getWidth(), view.getHeight(), dp(20));
                 }
             });
             panel.setClipToOutline(true);
@@ -163,58 +171,47 @@ public class OverlayView extends LinearLayout {
         LinearLayout h = new LinearLayout(ctx);
         GradientDrawable hbg = new GradientDrawable();
         hbg.setColor(C_HEADER);
-        hbg.setCornerRadii(new float[]{dp(22), dp(22), dp(22), dp(22), 0, 0, 0, 0});
+        hbg.setCornerRadii(new float[]{dp(20), dp(20), dp(20), dp(20), 0, 0, 0, 0});
         h.setBackground(hbg);
-        h.setPadding(dp(18), dp(16), dp(14), dp(16));
+        h.setPadding(dp(20), dp(16), dp(14), dp(16));
         h.setGravity(Gravity.CENTER_VERTICAL);
-
-        View bar = new View(ctx);
-        LayoutParams blp = new LayoutParams(dp(4), dp(20));
-        blp.setMargins(0, 0, dp(12), 0);
-        bar.setLayoutParams(blp);
-        GradientDrawable bbg = new GradientDrawable();
-        bbg.setColor(C_ACCENT); bbg.setCornerRadius(dp(6));
-        bar.setBackground(bbg);
-        h.addView(bar);
 
         LinearLayout col = new LinearLayout(ctx);
         col.setOrientation(VERTICAL);
         col.setLayoutParams(new LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f));
-        
-        // MONDEV + beta
+
         LinearLayout titleRow = new LinearLayout(ctx);
         titleRow.setGravity(Gravity.BOTTOM);
-        TextView brand = new TextView(ctx);
-        brand.setText("MONDEV");
-        brand.setTextColor(C_TEXT);
-        brand.setTextSize(14f);
-        brand.setTypeface(Typeface.create("sans-serif-black", Typeface.BOLD));
-        titleRow.addView(brand);
-        TextView betaTag = new TextView(ctx);
-        betaTag.setText(" beta");
-        betaTag.setTextColor(C_ACCENT);
-        betaTag.setTextSize(9f);
-        betaTag.setTypeface(Typeface.create("sans-serif-light", Typeface.ITALIC));
-        betaTag.setPadding(dp(4), 0, 0, dp(2));
-        titleRow.addView(betaTag);
+
+        TextView t1 = new TextView(ctx);
+        t1.setText("MONDEV");
+        t1.setLetterSpacing(0.1f);
+        t1.setTextColor(C_TEXT); t1.setTextSize(18f); t1.setTypeface(Typeface.create("sans-serif-black", Typeface.BOLD));
+        titleRow.addView(t1);
+
+        TextView tBeta = new TextView(ctx);
+        tBeta.setText(" beta");
+        tBeta.setTextColor(C_ACCENT); tBeta.setTextSize(10f); tBeta.setTypeface(Typeface.create("sans-serif-light", Typeface.ITALIC));
+        tBeta.setPadding(dp(4), 0, 0, dp(2));
+        titleRow.addView(tBeta);
+
         col.addView(titleRow);
-        
+
         long rem = authManager.getRemainingTime();
         String timeStr = formatTime(rem);
-        
+
         TextView t2 = new TextView(ctx);
         t2.setText("Subscription: " + timeStr);
-        t2.setTextColor(C_ACCENT);
-        t2.setTextSize(10f);
-        t2.setAlpha(0.9f);
+        t2.setTextColor(C_ACCENT); t2.setTextSize(10f);
+        t2.setAlpha(0.8f);
         col.addView(t2);
         h.addView(col);
 
         TextView minBtn = new TextView(ctx);
         minBtn.setText("—");
         minBtn.setTextColor(C_TEXT);
-        minBtn.setTextSize(16f);
-        minBtn.setPadding(dp(8), dp(4), dp(8), dp(4));
+        minBtn.setTextSize(18f);
+        minBtn.setPadding(dp(12), dp(8), dp(12), dp(8));
         minBtn.setOnClickListener(v -> showCollapsed());
         h.addView(minBtn);
         h.setOnTouchListener(dragL);
@@ -254,16 +251,16 @@ public class OverlayView extends LinearLayout {
             boolean a = i == idx;
             tabBtns[i].setTextColor(a ? C_ACCENT : C_SUBTEXT);
             GradientDrawable tbg = new GradientDrawable();
-            tbg.setColor(a ? Color.argb(40, 212, 175, 55) : Color.argb(15, 255, 255, 255));
+            tbg.setColor(a ? Color.argb(40, 255, 215, 0) : Color.argb(15, 255, 255, 255));
             tbg.setCornerRadius(dp(12));
-            if (a) tbg.setStroke(dp(1), Color.argb(150, 212, 175, 55));
+            if (a) tbg.setStroke(dp(1), Color.argb(150, 255, 215, 0));
             else tbg.setStroke(dp(1), Color.argb(20, 255, 255, 255));
             tabBtns[i].setBackground(tbg);
         }
         if (tabDash   != null) tabDash.setVisibility(idx == 0 ? VISIBLE : GONE);
-        if (tabRad    != null) tabRad.setVisibility(idx == 1 ? VISIBLE : GONE);
-        if (tabCombat != null) tabCombat.setVisibility(idx == 2 ? VISIBLE : GONE);
-        if (tabRoom   != null) tabRoom.setVisibility(idx == 3 ? VISIBLE : GONE);
+    if (tabRad    != null) tabRad.setVisibility(idx == 1 ? VISIBLE : GONE);
+    if (tabCombat != null) tabCombat.setVisibility(idx == 2 ? VISIBLE : GONE);
+    if (tabRoom   != null) tabRoom.setVisibility(idx == 3 ? VISIBLE : GONE);
     }
 
     private View buildContent(Context ctx) {
@@ -278,6 +275,7 @@ public class OverlayView extends LinearLayout {
         tabCombat = buildCombat(ctx);
         tabRoom   = buildRoomInfo(ctx);
 
+        // Use consistent LayoutParams for all tabs to avoid layout shifts
         FrameLayout.LayoutParams flp = new FrameLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
         tabDash.setLayoutParams(flp);
         tabRad.setLayoutParams(flp);
@@ -318,86 +316,65 @@ public class OverlayView extends LinearLayout {
 
     // ==================== DASHBOARD ====================
     private LinearLayout buildDash(Context ctx) {
-        LinearLayout t = new LinearLayout(ctx); 
-        t.setOrientation(VERTICAL);
+    LinearLayout t = new LinearLayout(ctx); 
+    t.setOrientation(VERTICAL);
 
-        t.addView(card(ctx, l -> {
-            l.addView(secTitle(ctx, "INTERFACE"));
-            l.addView(uiScaleSlider(ctx));
-            l.addView(vgap(ctx, 8));
-            l.addView(toggleRow(ctx, "Lock Position", "Disable menu dragging", "ui_lock", false));
-        }));
+    t.addView(card(ctx, l -> {
+        l.addView(secTitle(ctx, "SYSTEM SETTINGS"));
+        l.addView(uiScaleSlider(ctx));
+        l.addView(vgap(ctx, 8));
+        l.addView(toggleRow(ctx, "Lock Position", "Disable menu dragging", "ui_lock", false));
+    }));
 
-        t.addView(card(ctx, l -> {
-            l.addView(secTitle(ctx, "COMMUNITY"));
-            // Tombol Telegram
-            l.addView(btnTelegram(ctx));
-            l.addView(vgap(ctx, 10));
-            l.addView(btn(ctx, "RESET ALL CONFIGURATIONS", C_BTN_DRK, () -> {
-                prefs.edit().clear().apply();
-                sendConfigToCpp(prefs);
-                refreshAllUI();
-                radar.invalidate();
-                android.widget.Toast.makeText(ctx, "All settings reset", android.widget.Toast.LENGTH_SHORT).show();
-            }));
-        }));
-
-        return t;
-    }
-
-    private View btnTelegram(Context ctx) {
-        TextView b = new TextView(ctx);
-        b.setText("JOIN TELEGRAM");
-        b.setTextColor(Color.WHITE);
-        b.setGravity(Gravity.CENTER);
-        b.setPadding(dp(16), dp(12), dp(16), dp(12));
-        b.setTextSize(11f);
-        b.setTypeface(null, Typeface.BOLD);
-        b.setLetterSpacing(0.05f);
-        GradientDrawable bg = new GradientDrawable();
-        bg.setColor(C_TELEGRAM);
-        bg.setCornerRadius(dp(12));
-        b.setBackground(bg);
-        b.setOnClickListener(v -> {
-            android.content.Intent i = new android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://t.me/modfreew"));
-            i.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK);
+    t.addView(card(ctx, l -> {
+        l.addView(secTitle(ctx, "COMMUNITY & SUPPORT"));
+        l.addView(btn(ctx, "JOIN TELEGRAM CHANNEL", C_TELEGRAM, () -> {
+            Intent i = new Intent(Intent.ACTION_VIEW, Uri.parse("https://t.me/modfreew"));
+            i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             context.startActivity(i);
-        });
-        LayoutParams lp = new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
-        b.setLayoutParams(lp);
-        return b;
-    }
+        }));
+        l.addView(vgap(ctx, 8));
+        l.addView(btn(ctx, "RESET ALL CONFIGURATIONS", C_BTN_DRK, () -> {
+            prefs.edit().clear().apply();
+            sendConfigToCpp(prefs);
+            refreshAllUI();
+            radar.invalidate();
+            android.widget.Toast.makeText(ctx, "Settings reset to default", android.widget.Toast.LENGTH_SHORT).show();
+        }));
+    }));
+
+    return t;
+}
 
     // ==================== RADAR MAP ====================
     private LinearLayout buildRadar(Context ctx) {
-        LinearLayout t = new LinearLayout(ctx); 
-        t.setOrientation(VERTICAL);
+    LinearLayout t = new LinearLayout(ctx); 
+    t.setOrientation(VERTICAL);
 
-        t.addView(card(ctx, l -> {
-            l.addView(secTitle(ctx, "MINIMAP RADAR"));
-            l.addView(toggleRow(ctx, "Enable Radar", "Show enemy positions on minimap", "radar_enable", false));
-            l.addView(vgap(ctx, 6));
-            l.addView(toggleRow(ctx, "Draw Border", "Display border around radar area", "radar_border", true));
+    t.addView(card(ctx, l -> {
+        l.addView(secTitle(ctx, "RADAR"));
+        l.addView(toggleRow(ctx, "Enable Radar", "Show minimap overlay", "radar_enable", false));
+        l.addView(vgap(ctx, 6));
+        l.addView(toggleRow(ctx, "Draw Border", "Border around radar", "radar_border", true));
+    }));
+
+    t.addView(card(ctx, l -> {
+        l.addView(secTitle(ctx, "SIZE & POSITION"));
+        l.addView(slider(ctx, "X Position", "radar_pos_x", 0, 2000, 71));
+        l.addView(slider(ctx, "Map Size", "radar_size", 80, 600, 338));
+        l.addView(slider(ctx, "Icon Size", "radar_icon_size", 10, 100, 37));
+        
+        l.addView(vgap(ctx, 8));
+        l.addView(btn(ctx, "Reset Defaults", C_BTN_DRK, () -> {
+            prefs.edit().putFloat("radar_pos_x",71f)
+                .putFloat("radar_size",338f)
+                .putFloat("radar_icon_size",37f).apply();
+            radar.invalidate();
         }));
+    }));
 
-        t.addView(card(ctx, l -> {
-            l.addView(secTitle(ctx, "ADJUSTMENTS"));
-            l.addView(slider(ctx, "X Position", "radar_pos_x", 0, 2000, 71));
-            l.addView(slider(ctx, "Map Size", "radar_size", 80, 600, 338));
-            l.addView(slider(ctx, "Icon Size", "radar_icon_size", 10, 100, 37));
-            
-            l.addView(vgap(ctx, 8));
-            l.addView(btn(ctx, "RESET RADAR POSITION", C_BTN_DRK, () -> {
-                prefs.edit().putFloat("radar_pos_x",71f)
-                    .putFloat("radar_size",338f)
-                    .putFloat("radar_icon_size",37f).apply();
-                radar.invalidate();
-            }));
-        }));
-
-        return t;
-    }
-
+    return t;
+}
     // ==================== COMBAT & AIM ====================
     private LinearLayout buildCombat(Context ctx) {
         LinearLayout t = new LinearLayout(ctx); t.setOrientation(VERTICAL);
@@ -407,10 +384,10 @@ public class OverlayView extends LinearLayout {
 
             LinearLayout ac = new LinearLayout(ctx); ac.setOrientation(VERTICAL);
             ac.addView(secTitle(ctx, "AIMBOT"));
-            ac.addView(checkRow(ctx, "Enable Aimbot", "aimbot_enable", false));
+            ac.addView(checkRow(ctx, "Aimbot All",   "aimbot_enable", false));
             ac.addView(vgap(ctx, 8));
             ac.addView(secTitle(ctx, "LING MODE"));
-            ac.addView(radioRowVertical(ctx, "ling_mode", new String[]{"Disabled", "Manual", "Auto"}));
+            ac.addView(radioRowVertical(ctx, "ling_mode", new String[]{"Off", "Manual", "Auto"}));
 
             cols.addView(ac, new LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f));
 
@@ -421,32 +398,50 @@ public class OverlayView extends LinearLayout {
             LinearLayout rc = new LinearLayout(ctx); rc.setOrientation(VERTICAL);
             rc.setPadding(dp(10), 0, 0, 0);
             rc.addView(secTitle(ctx, "RETRIBUTION"));
-            // Blue Buff & Red Buff
-            rc.addView(checkRowColored(ctx, "Buff (Blue)", "retri_buff", false, Color.parseColor("#42A5F5")));
-            rc.addView(checkRowColored(ctx, "Buff (Red)", "retri_red_buff", false, Color.parseColor("#EF5350")));
-            rc.addView(checkRow(ctx, "Lord", "retri_lord", false));
+
+            // Buff Blue & Buff Red sebagai info teks berwarna (pure text, bukan toggle)
+            TextView tvBuffBlue = new TextView(ctx);
+            tvBuffBlue.setText("● Buff Blue");
+            tvBuffBlue.setTextColor(Color.parseColor("#42A5F5"));
+            tvBuffBlue.setTextSize(12f);
+            tvBuffBlue.setTypeface(null, Typeface.BOLD);
+            tvBuffBlue.setPadding(0, dp(4), 0, dp(4));
+            rc.addView(tvBuffBlue);
+
+            TextView tvBuffRed = new TextView(ctx);
+            tvBuffRed.setText("● Buff Red");
+            tvBuffRed.setTextColor(Color.parseColor("#EF5350"));
+            tvBuffRed.setTextSize(12f);
+            tvBuffRed.setTypeface(null, Typeface.BOLD);
+            tvBuffRed.setPadding(0, dp(4), 0, dp(4));
+            rc.addView(tvBuffRed);
+
+            rc.addView(checkRow(ctx, "Lord",   "retri_lord",   false));
             rc.addView(checkRow(ctx, "Turtle", "retri_turtle", false));
-            rc.addView(checkRow(ctx, "Litho", "retri_litho", false));
+            rc.addView(checkRow(ctx, "Litho",  "retri_litho",  false));
             cols.addView(rc, new LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f));
             l.addView(cols);
         }));
 
-        // LOCK HERO
+        // ---------- LOCK HERO ----------
+        // ---------- LOCK HERO ----------
         t.addView(card(ctx, l -> {
-            l.addView(secTitle(ctx, "TARGET LOCKING"));
-            l.addView(toggleRow(ctx, "Enable Hero Lock", "Focus on specific target", "lock_hero_enable", false));
+            l.addView(secTitle(ctx, "LOCK HERO"));
+            l.addView(toggleRow(ctx, "Enable Hero Lock", "Prioritize specific target", "lock_hero_enable", false));
             
             String currentHero = prefs.getString("locked_hero_name", "");
             if (currentHero.isEmpty()) currentHero = "None";
 
             final TextView[] btnHeroRef = new TextView[1];
-            btnHeroRef[0] = (TextView) btn(ctx, "Select Hero: [" + currentHero + "]", C_BTN_DRK, () -> {
+            
+            btnHeroRef[0] = (TextView) btn(ctx, "Pilih Hero:[" + currentHero + "]", C_BTN_DRK, () -> {
                 java.util.List<String> listHero = radar.getActiveEnemyNames();
                 if (listHero.isEmpty()) {
-                    android.widget.Toast.makeText(ctx, "No enemies detected on radar!", android.widget.Toast.LENGTH_SHORT).show();
+                    android.widget.Toast.makeText(ctx, "Enemy not detected yet!", android.widget.Toast.LENGTH_SHORT).show();
                 } else {
                     String[] items = listHero.toArray(new String[0]);
-                    showModernDialog(ctx, "SELECT TARGET HERO", items, selected -> {
+                    // MENGGUNAKAN CUSTOM DIALOG MODERN
+                    showModernDialog(ctx, "TARGET LOCK HERO", items, selected -> {
                         prefs.edit().putString("locked_hero_name", selected).apply();
                         if (btnHeroRef[0] != null) btnHeroRef[0].setText("Select Hero: [" + selected + "]");
                         sendConfigToCpp(prefs);
@@ -456,24 +451,31 @@ public class OverlayView extends LinearLayout {
             l.addView(btnHeroRef[0]);
         }));
 
-        // HERO COMBO
+
+      // ---------- HERO COMBO ----------
         t.addView(card(ctx, l -> {
-            l.addView(secTitle(ctx, "HERO SPECIALS"));
+            l.addView(secTitle(ctx, "HERO SETTING"));
             
             String currentCombo = prefs.getString("selected_combo", "none");
             String displayCombo = "None";
+            
+            // Gunakan .contains agar embel-embel teks tidak merusak deteksi
             if (currentCombo.contains("gusion")) displayCombo = "Gusion";
             else if (currentCombo.contains("kadita")) displayCombo = "Kadita";
-            else if (currentCombo.contains("beatrix")) displayCombo = "Beatrix (Ultimate Precision)";
-            else if (currentCombo.contains("kimmy")) displayCombo = "Kimmy (Experimental)";
+            else if (currentCombo.contains("beatrix")) displayCombo = "Beatrix(ultimate lock)";
+            else if (currentCombo.contains("kimmy")) displayCombo = "Kimmy auto (maybe bug)";
             
             final TextView[] btnComboRef = new TextView[1];
-            btnComboRef[0] = (TextView) btn(ctx, "Active Combo: [" + displayCombo + "]", C_BTN_DRK, () -> {
-                String[] comboList = {"None", "Gusion", "Kadita", "Beatrix (Ultimate Precision)", "Kimmy (Experimental)"};
-                showModernDialog(ctx, "SELECT HERO COMBO", comboList, selected -> {
+            
+            btnComboRef[0] = (TextView) btn(ctx, "Select Hero: [" + displayCombo + "]", C_BTN_DRK, () -> {
+                String[] comboList = {"None", "Gusion", "Kadita", "Beatrix(ultimate lock)", "Kimmy auto (maybe bug)"};
+                
+                showModernDialog(ctx, "PILIH HERO COMBO", comboList, selected -> {
+                    // Simpan seluruh teks ke huruf kecil
                     String valueToSave = selected.equals("None") ? "none" : selected.toLowerCase();
                     prefs.edit().putString("selected_combo", valueToSave).apply();
-                    if (btnComboRef[0] != null) btnComboRef[0].setText("Active Combo: [" + selected + "]");
+                    
+                    if (btnComboRef[0] != null) btnComboRef[0].setText("Select Combo: [" + selected + "]");
                     sendConfigToCpp(prefs);
                 });
             });
@@ -481,86 +483,14 @@ public class OverlayView extends LinearLayout {
         }));
 
         t.addView(card(ctx, l -> {
-            l.addView(secTitle(ctx, "PRIORITY & DETECTION"));
+            l.addView(secTitle(ctx, "TARGET PRIORITY"));
             l.addView(radioRow(ctx, "aimbot_target", new String[]{"Nearest", "Low HP", "Low HP %"}));
-            l.addView(vgap(ctx, 8));
-            l.addView(slider(ctx, "Aimbot FOV Range", "aimbot_fov", 0, 250, 200));
         }));
-        return t;
-    }
-
-    private View checkRowColored(Context ctx, String title, String key, boolean def, int color) {
-        LinearLayout r = new LinearLayout(ctx); 
-        r.setGravity(Gravity.CENTER_VERTICAL);
-        r.setPadding(0, dp(6), 0, dp(6));
-        
-        boolean init = prefs.getBoolean(key, def);
-        final boolean[] st = {init};
-
-        TextView box = new TextView(ctx);
-        box.setLayoutParams(new LayoutParams(dp(18), dp(18)));
-        box.setGravity(Gravity.CENTER);
-        box.setTextSize(11f);
-        box.setTypeface(null, Typeface.BOLD);
-
-        Runnable updateBox = () -> {
-            GradientDrawable bg = new GradientDrawable();
-            bg.setCornerRadius(dp(4));
-            if (st[0]) {
-                bg.setColor(color);
-                box.setText("✓");
-                box.setTextColor(C_BG);
-            } else {
-                bg.setColor(C_BG);
-                bg.setStroke(dp(1), C_SUBTEXT);
-                box.setText("");
-            }
-            box.setBackground(bg);
-        };
-        updateBox.run();
-
-        TextView lbl = new TextView(ctx); 
-        lbl.setText(title); 
-        lbl.setTextColor(C_TEXT); 
-        lbl.setTextSize(12f);
-        LayoutParams llp = new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
-        llp.setMargins(dp(10), 0, 0, 0);
-        lbl.setLayoutParams(llp);
-
-        r.addView(box); r.addView(lbl);
-        r.setOnClickListener(v -> {
-            if (!authManager.isKeyValid()) {
-                android.widget.Toast.makeText(getContext(), "Session expired! Please login again.", android.widget.Toast.LENGTH_SHORT).show();
-                return;
-            }
-            st[0] = !st[0];
-            prefs.edit().putBoolean(key, st[0]).apply();
-            sendConfigToCpp(prefs);
-            updateBox.run();
-            radar.invalidate();
-        });
-        return r;
-    }
-
-    // ==================== ROOM INFO ====================
-    private LinearLayout buildRoomInfo(Context ctx) {
-        LinearLayout t = new LinearLayout(ctx); 
-        t.setOrientation(VERTICAL);
 
         t.addView(card(ctx, l -> {
-            l.addView(secTitle(ctx, "ROOM MONITOR"));
-            l.addView(toggleRow(ctx, "Enable Room Info", "View enemy ranks and data during draft pick", "room_info_enable", false));
+            l.addView(secTitle(ctx, "DETECTION"));
+            l.addView(slider(ctx, "Aimbot FOV Range", "aimbot_fov", 0, 250, 200));
         }));
-
-        roomTableContainer = new LinearLayout(ctx);
-        roomTableContainer.setOrientation(VERTICAL);
-        t.addView(roomTableContainer);
-
-        if (!isRoomSocketRunning) {
-            isRoomSocketRunning = true;
-            startRoomSocketThread();
-        }
-
         return t;
     }
 
@@ -570,7 +500,7 @@ public class OverlayView extends LinearLayout {
         col.setPadding(0, dp(4), 0, dp(4));
 
         LinearLayout labelRow = new LinearLayout(ctx); labelRow.setGravity(Gravity.CENTER_VERTICAL);
-        TextView ttl = new TextView(ctx); ttl.setText("Interface Scale");
+        TextView ttl = new TextView(ctx); ttl.setText("UI Scale");
         ttl.setTextColor(C_TEXT); ttl.setTextSize(12f);
         ttl.setLayoutParams(new LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f));
         labelRow.addView(ttl);
@@ -582,17 +512,13 @@ public class OverlayView extends LinearLayout {
         labelRow.addView(tvVal);
         col.addView(labelRow);
 
-        TextView sub = new TextView(ctx); sub.setText("Adjust window and text size");
+        TextView sub = new TextView(ctx); sub.setText("Scale window & text");
         sub.setTextColor(C_SUBTEXT); sub.setTextSize(10f); sub.setPadding(0, 0, 0, dp(4));
         col.addView(sub);
 
         SeekBar sb = new SeekBar(ctx);
         sb.setMax(20);
         sb.setProgress((int)(((initScale - 0.5f) / 0.05f)));
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            sb.setProgressTintList(android.content.res.ColorStateList.valueOf(C_ACCENT));
-            sb.setThumbTintList(android.content.res.ColorStateList.valueOf(C_ACCENT));
-        }
         sb.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override
             public void onProgressChanged(SeekBar s, int p, boolean u) {
@@ -631,6 +557,7 @@ public class OverlayView extends LinearLayout {
         tabCombat = buildCombat(ctx);
         tabRoom   = buildRoomInfo(ctx);
 
+        // Apply consistent LayoutParams during refresh
         FrameLayout.LayoutParams flp = new FrameLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
         tabDash.setLayoutParams(flp);
         tabRad.setLayoutParams(flp);
@@ -691,7 +618,7 @@ public class OverlayView extends LinearLayout {
         r.addView(tc);
         r.addView(buildToggle(ctx, prefs.getBoolean(key, def), on -> {
             if (!authManager.isKeyValid()) {
-                android.widget.Toast.makeText(getContext(), "Session expired! Please login again.", android.widget.Toast.LENGTH_SHORT).show();
+                android.widget.Toast.makeText(getContext(), " Key Expired! Please Relogin.", android.widget.Toast.LENGTH_SHORT).show();
                 return;
             }
             prefs.edit().putBoolean(key, on).apply();
@@ -702,8 +629,59 @@ public class OverlayView extends LinearLayout {
     }
 
     private View checkRow(Context ctx, String title, String key, boolean def) {
-        return checkRowColored(ctx, title, key, def, C_ACCENT);
+        LinearLayout r = new LinearLayout(ctx); 
+        r.setGravity(Gravity.CENTER_VERTICAL);
+        r.setPadding(0, dp(6), 0, dp(6));
+        
+        boolean init = prefs.getBoolean(key, def);
+        final boolean[] st = {init};
+
+        // Custom Modern Checkbox Box (Bentuk Kotak)
+        TextView box = new TextView(ctx);
+        box.setLayoutParams(new LayoutParams(dp(18), dp(18)));
+        box.setGravity(Gravity.CENTER);
+        box.setTextSize(11f);
+        box.setTypeface(null, Typeface.BOLD);
+
+        Runnable updateBox = () -> {
+            GradientDrawable bg = new GradientDrawable();
+            bg.setCornerRadius(dp(4));
+            if (st[0]) {
+                bg.setColor(C_ACCENT); // Full warna biru jika on
+                box.setText("✓");
+                box.setTextColor(C_BG); // Warna centang gelap
+            } else {
+                bg.setColor(C_BG);
+                bg.setStroke(dp(1), C_SUBTEXT); // Border saja jika off
+                box.setText("");
+            }
+            box.setBackground(bg);
+        };
+        updateBox.run();
+
+        TextView lbl = new TextView(ctx); 
+        lbl.setText(title); 
+        lbl.setTextColor(C_TEXT); 
+        lbl.setTextSize(12f);
+        LayoutParams llp = new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
+        llp.setMargins(dp(10), 0, 0, 0);
+        lbl.setLayoutParams(llp);
+
+        r.addView(box); r.addView(lbl);
+        r.setOnClickListener(v -> {
+            if (!authManager.isKeyValid()) {
+                android.widget.Toast.makeText(getContext(), " Key Expired! Please Relogin.", android.widget.Toast.LENGTH_SHORT).show();
+                return;
+            }
+            st[0] = !st[0];
+            prefs.edit().putBoolean(key, st[0]).apply();
+            sendConfigToCpp(prefs);
+            updateBox.run(); // Animasi update centang
+            radar.invalidate();
+        });
+        return r;
     }
+    interface TCb { void t(boolean on); }
 
     private View buildToggle(Context ctx, boolean init, TCb cb) {
         final boolean[] on = {init};
@@ -734,7 +712,6 @@ public class OverlayView extends LinearLayout {
         });
         return track;
     }
-    interface TCb { void t(boolean on); }
 
     private View slider(Context ctx, String title, String key, float min, float max, float def) {
         LinearLayout c = new LinearLayout(ctx); c.setOrientation(VERTICAL); c.setPadding(0, dp(6), 0, dp(6));
@@ -761,6 +738,7 @@ public class OverlayView extends LinearLayout {
             sb.setThumbTintList(android.content.res.ColorStateList.valueOf(C_ACCENT));
         }
 
+        // Helper to update value
         java.util.function.Consumer<Float> updateVal = (v) -> {
             float finalV = Math.max(min, Math.min(max, v));
             tv.setText(String.format("%.0f", finalV));
@@ -870,6 +848,13 @@ public class OverlayView extends LinearLayout {
         b.setOnClickListener(v -> r.run()); return b;
     }
 
+    private TextView pillBtn(Context ctx, String text, int tc, int bgC) {
+        TextView tv = new TextView(ctx); tv.setText(text); tv.setTextColor(tc);
+        tv.setTextSize(12f); tv.setGravity(Gravity.CENTER); tv.setPadding(dp(10),dp(6),dp(10),dp(6));
+        GradientDrawable d = new GradientDrawable(); d.setColor(bgC); d.setCornerRadius(dp(6));
+        tv.setBackground(d); return tv;
+    }
+
     private View vgap(Context ctx, int dpVal) {
         View v = new View(ctx); v.setLayoutParams(new LayoutParams(LayoutParams.MATCH_PARENT, dp(dpVal)));
         return v;
@@ -879,9 +864,9 @@ public class OverlayView extends LinearLayout {
     private void showExpanded()  { tvPill.setVisibility(GONE); panel.setVisibility(VISIBLE); }
     private String formatTime(long seconds) {
         if (seconds <= 0) return "Expired";
-        if (seconds > 86400) return (seconds / 86400) + " Day(s)";
-        if (seconds > 3600) return (seconds / 3600) + " Hour(s)";
-        return (seconds / 60) + " Minute(s)";
+        if (seconds > 86400) return (seconds / 86400) + " Day";
+        if (seconds > 3600) return (seconds / 3600) + " O'clock";
+        return (seconds / 60) + " Minute";
     }
 
     private int dp(int v) { return (int)(v * getContext().getResources().getDisplayMetrics().density); }
@@ -909,8 +894,11 @@ public class OverlayView extends LinearLayout {
                         float scale = prefs.getFloat("ui_scale", 1.0f);
                         int scaledW = (int)(viewW * scale);
                         int scaledH = (int)(viewH * scale);
+                        
+                        // Fix: Using 0 to allow moving to very edge, and properly calculate maxX/Y
                         int maxX = realScreenW - (v == tvPill ? viewW : scaledW);
                         int maxY = realScreenH - (v == tvPill ? viewH : scaledH);
+                        
                         lp.x = Math.max(0, Math.min(ix + dx, maxX));
                         lp.y = Math.max(0, Math.min(iy + dy, maxY));
                         wm.updateViewLayout(OverlayView.this, lp);
@@ -925,23 +913,27 @@ public class OverlayView extends LinearLayout {
         }
     };
     
+// Interface untuk aksi dialog
     public interface DialogCallback {
         void onSelect(String item);
     }
 
+    // Custom UI Dialog Floating Ala Premium Mod
     private void showModernDialog(Context ctx, String title, String[] items, final DialogCallback callback) {
         final FrameLayout dimBg = new FrameLayout(ctx);
-        dimBg.setBackgroundColor(Color.argb(180, 0, 0, 0));
-        dimBg.setOnClickListener(v -> { try { wm.removeView(dimBg); } catch (Exception ignored) {} });
+        dimBg.setBackgroundColor(Color.argb(180, 0, 0, 0)); // Background gelap blur
+        dimBg.setOnClickListener(v -> { try { wm.removeView(dimBg); } catch (Exception ignored) {} }); // Klik luar untuk tutup
 
         LinearLayout card = new LinearLayout(ctx);
         card.setOrientation(VERTICAL);
         GradientDrawable gd = new GradientDrawable();
         gd.setColor(C_CARD);
         gd.setCornerRadius(dp(16));
-        gd.setStroke(dp(1), Color.argb(100, 212, 175, 55));
+        gd.setStroke(dp(1), Color.argb(100, 255, 215, 0));// Border neon tipis
         card.setBackground(gd);
         card.setPadding(dp(20), dp(20), dp(20), dp(20));
+        
+        // Agar klik di card tidak ikut menutup dialog (menahan event dari dimBg)
         card.setOnClickListener(v -> {});
 
         TextView tvTitle = new TextView(ctx);
@@ -997,8 +989,35 @@ public class OverlayView extends LinearLayout {
         );
         try { wm.addView(dimBg, lp); } catch (Exception ignored) {}
     }
+    
+    private LinearLayout roomTableContainer;
+    private boolean isRoomSocketRunning = false;
 
-    // ==================== ROOM SOCKET THREAD ====================
+    private LinearLayout buildRoomInfo(Context ctx) {
+        LinearLayout t = new LinearLayout(ctx); 
+        t.setOrientation(VERTICAL);
+
+        t.addView(card(ctx, l -> {
+            l.addView(secTitle(ctx, "ROOM INFO & DRAFT PICK"));
+            
+            // TOMBOL ON/OFF AGAR TIDAK BIKIN LAG!
+            l.addView(toggleRow(ctx, "Enable Room Info", "Tampilkan data pemain saat Draft Pick", "room_info_enable", false));
+            l.addView(vgap(ctx, 10));
+
+            roomTableContainer = new LinearLayout(ctx);
+            roomTableContainer.setOrientation(VERTICAL);
+            l.addView(roomTableContainer);
+        }));
+
+        if (!isRoomSocketRunning) {
+            isRoomSocketRunning = true;
+            startRoomSocketThread();
+        }
+
+        return t;
+    }
+
+    // Class pembantu untuk menyimpan data parsing sementara
     private static class RoomPlayerData {
         int camp, uid, zone, heroId, rank, mythPt, matches, wins, accLv, spellId, countryId;
         boolean isLeader;
@@ -1016,6 +1035,7 @@ public class OverlayView extends LinearLayout {
                     dis = new java.io.DataInputStream(socket.getInputStream());
 
                     byte[] countBuf = new byte[4];
+                    // UKURAN BARU: 12 integer * 4 bytes + 32 char bytes = 80 Bytes!
                     byte[] packetBuf = new byte[80];
 
                     while (isRoomSocketRunning) {
@@ -1024,11 +1044,15 @@ public class OverlayView extends LinearLayout {
                         if (count > 10 || count < 0) count = 0;
 
                         final java.util.List<RoomPlayerData> players = new java.util.ArrayList<>();
+                        
+                        // KITA SELALU BACA DATA DARI C++ AGAR BUFFER TIDAK PENUH,
+                        // TAPI KITA HANYA RENDER JIKA TOGGLE DIAKTIFKAN.
                         boolean isEnabled = prefs.getBoolean("room_info_enable", false);
 
                         for (int i = 0; i < count; i++) {
                             dis.readFully(packetBuf);
-                            if (!isEnabled) continue;
+                            
+                            if (!isEnabled) continue; // Jangan buang CPU parse jika dimatikan
 
                             java.nio.ByteBuffer bb = java.nio.ByteBuffer.wrap(packetBuf).order(java.nio.ByteOrder.LITTLE_ENDIAN);
                             RoomPlayerData p = new RoomPlayerData();
@@ -1048,28 +1072,34 @@ public class OverlayView extends LinearLayout {
                             byte[] nameBytes = new byte[32];
                             bb.get(nameBytes);
                             p.name = new String(nameBytes).trim();
+                            
                             players.add(p);
                         }
 
+                        // Update UI di Main Thread
                         post(() -> {
                             if (roomTableContainer == null) return;
                             roomTableContainer.removeAllViews();
+                            
                             if (!isEnabled) {
                                 TextView tv = new TextView(getContext());
-                                tv.setText("Room Monitor is disabled. Turn on to view.");
+                                tv.setText("Room Info is Disabled. Turn on to view.");
                                 tv.setTextColor(C_SUBTEXT);
                                 tv.setTextSize(12f);
                                 roomTableContainer.addView(tv);
                                 return;
                             }
+
                             if (players.isEmpty()) {
                                 TextView tv = new TextView(getContext());
-                                tv.setText("Waiting for match data...");
+                                tv.setText("Waiting for Match / Draft Pick...");
                                 tv.setTextColor(C_ACCENT);
                                 tv.setTextSize(12f);
                                 roomTableContainer.addView(tv);
                                 return;
                             }
+
+                            // Render Card per pemain (Cantik & Rapi)
                             for (RoomPlayerData p : players) {
                                 roomTableContainer.addView(createPlayerCard(p));
                             }
@@ -1085,6 +1115,9 @@ public class OverlayView extends LinearLayout {
         }).start();
     }
 
+// ==========================================
+    // UI BUILDER UNTUK PLAYER CARD (+ GAMBAR ICON)
+    // ==========================================
     private View createPlayerCard(RoomPlayerData p) {
         Context ctx = getContext();
         LinearLayout card = new LinearLayout(ctx);
@@ -1107,12 +1140,13 @@ public class OverlayView extends LinearLayout {
         cardLp.setMargins(0, 0, 0, dp(6));
         card.setLayoutParams(cardLp);
 
-        // Left: Hero icon + Spell icon
+        // BAGIAN KIRI: Icon Hero & Icon Spell (Dengan Fallback ID)
         LinearLayout colLeft = new LinearLayout(ctx);
         colLeft.setOrientation(HORIZONTAL);
         colLeft.setGravity(Gravity.CENTER_VERTICAL);
         colLeft.setLayoutParams(new LayoutParams(dp(80), LayoutParams.WRAP_CONTENT));
         
+// --- 1. HERO ICON ---
         FrameLayout heroContainer = new FrameLayout(ctx);
         heroContainer.setLayoutParams(new LayoutParams(dp(36), dp(36)));
 
@@ -1120,6 +1154,7 @@ public class OverlayView extends LinearLayout {
         ivHero.setLayoutParams(new FrameLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
         ivHero.setScaleType(android.widget.ImageView.ScaleType.FIT_XY);
         
+        // HAPUS RUMUS BOT (realHeroId / 10). KITA PAKAI ID MURNI DARI GAME!
         String heroFileName = getHeroNameStr(p.heroId); 
         android.graphics.Bitmap heroBmp = radar.getRawIcon(heroFileName);
 
@@ -1133,6 +1168,7 @@ public class OverlayView extends LinearLayout {
         } else {
             ivHero.setBackgroundColor(Color.parseColor("#444444"));
             heroContainer.addView(ivHero);
+            
             TextView tvHeroId = new TextView(ctx);
             tvHeroId.setText(String.valueOf(p.heroId));
             tvHeroId.setTextColor(Color.WHITE);
@@ -1142,6 +1178,7 @@ public class OverlayView extends LinearLayout {
             heroContainer.addView(tvHeroId);
         }
         
+        // --- 2. SPELL ICON ---
         FrameLayout spellContainer = new FrameLayout(ctx);
         LayoutParams spellLp = new LayoutParams(dp(22), dp(22));
         spellLp.setMargins(dp(6), 0, 0, 0); 
@@ -1158,10 +1195,12 @@ public class OverlayView extends LinearLayout {
             ivSpell.setImageBitmap(spellBmp);
             spellContainer.addView(ivSpell);
         } else {
+            // JIKA GAMBAR SPELL TIDAK ADA, TAMPILKAN KOTAK + ANGKA ID
             ivSpell.setBackgroundColor(Color.parseColor("#444444"));
             spellContainer.addView(ivSpell);
+            
             TextView tvSpellId = new TextView(ctx);
-            tvSpellId.setText(String.valueOf(p.spellId));
+            tvSpellId.setText(String.valueOf(p.spellId)); // MENAMPILKAN ID SPELL ASLI DARI MLBB!
             tvSpellId.setTextColor(Color.WHITE);
             tvSpellId.setTextSize(6f);
             tvSpellId.setGravity(Gravity.CENTER);
@@ -1172,7 +1211,7 @@ public class OverlayView extends LinearLayout {
         colLeft.addView(heroContainer);
         colLeft.addView(spellContainer);
 
-        // Middle: Name, UID, Level
+        // BAGIAN TENGAH: Nama, UID, Level Akun
         LinearLayout colMid = new LinearLayout(ctx);
         colMid.setOrientation(VERTICAL);
         colMid.setLayoutParams(new LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f));
@@ -1184,7 +1223,7 @@ public class OverlayView extends LinearLayout {
         tvName.setTextSize(12f);
         tvName.setTypeface(null, Typeface.BOLD);
         tvName.setSingleLine(true);
-        tvName.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        tvName.setEllipsize(android.text.TextUtils.TruncateAt.END); // <--- TAMBAHKAN INI (Biar nama panjang jadi "Nizararap...")
 
         TextView tvUid = new TextView(ctx);
         tvUid.setText("UID: " + p.uid + " | Lv." + p.accLv);
@@ -1194,13 +1233,17 @@ public class OverlayView extends LinearLayout {
         colMid.addView(tvName);
         colMid.addView(tvUid);
 
-        // Right: Rank & Winrate
+        // BAGIAN KANAN: Rank & Winrate
         LinearLayout colRight = new LinearLayout(ctx);
         colRight.setOrientation(VERTICAL);
         colRight.setGravity(Gravity.END);
+        
+        // --- 🟢 TAMBAHKAN 3 BARIS INI 🟢 ---
+        // Memberikan jarak agar teks tidak mepet dengan batas kanan
         LayoutParams rightLp = new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
         rightLp.setMargins(dp(10), 0, dp(5), 0); 
         colRight.setLayoutParams(rightLp);
+        // -----------------------------------
         
         TextView tvRank = new TextView(ctx);
         tvRank.setText(getRankName(p.rank, p.mythPt));
@@ -1212,6 +1255,7 @@ public class OverlayView extends LinearLayout {
         TextView tvWr = new TextView(ctx);
         tvWr.setText(String.format("%.1f%% (%d M)", wr, p.matches));
         tvWr.setTextSize(10.5f);
+        
         if (wr >= 65.0f && p.matches >= 20) tvWr.setTextColor(Color.parseColor("#00E676")); 
         else if (wr >= 50.0f) tvWr.setTextColor(Color.parseColor("#FFA726")); 
         else if (wr > 0f && p.matches >= 10) tvWr.setTextColor(Color.parseColor("#EF5350")); 
@@ -1226,8 +1270,9 @@ public class OverlayView extends LinearLayout {
 
         return card;
     }
-
-    // Rank array (136 indexes)
+    
+    
+    // Array Rank Lengkap 136 Index (Sesuai source C++ kamu)
     private final String[] strRank = {
         "Warrior III *1", "Warrior III *2", "Warrior III *3",
         "Warrior II *0", "Warrior II *1", "Warrior II *2", "Warrior II *3",
@@ -1269,6 +1314,9 @@ public class OverlayView extends LinearLayout {
         }
     }
 
+    // ==========================================
+    // TRANSLATOR: SPELL ID -> NAMA FILE PNG/WEBP
+    // ==========================================
     private String getSpellNameStr(int spellId) {
         switch (spellId) {
             case 20150: return "execute";
@@ -1283,149 +1331,155 @@ public class OverlayView extends LinearLayout {
             case 20100: return "flameshot";
             case 20110: return "arrival";
             case 20120: return "vengeance";
+            // JIKA NANTI EXECUTE TETAP ANGKA (Misal 80001), TAMBAHKAN DI SINI:
+            // case 80001: return "execute";
             default: return "unknown_spell"; 
         }
     }
 
+    // ==========================================
+    // TRANSLATOR LENGKAP: HERO ID -> NAMA FILE
+    // ==========================================
     private String getHeroNameStr(int heroId) {
-        switch(heroId) {
-            case 1: return "miya";
-            case 2: return "balmond";
-            case 3: return "saber";
-            case 4: return "alice";
-            case 5: return "nana";
-            case 6: return "tigreal";
-            case 7: return "alucard";
-            case 8: return "karina";
-            case 9: return "akai";
-            case 10: return "franco";
-            case 11: return "bane";
-            case 12: return "bruno";
-            case 13: return "clint";
-            case 14: return "rafaela";
-            case 15: return "eudora";
-            case 16: return "zilong";
-            case 17: return "fanny";
-            case 18: return "layla";
-            case 19: return "minotaur";
-            case 20: return "lolita";
-            case 21: return "hayabusa";
-            case 22: return "freya";
-            case 23: return "gord";
-            case 24: return "natalia";
-            case 25: return "kagura";
-            case 26: return "chou";
-            case 27: return "sun";
-            case 28: return "alpha";
-            case 29: return "ruby";
-            case 30: return "yisunshin";
-            case 31: return "moskov";
-            case 32: return "johnson";
-            case 33: return "cyclops";
-            case 34: return "estes";
-            case 35: return "hilda";
-            case 36: return "aurora";
-            case 37: return "lapulapu";
-            case 38: return "vexana";
-            case 39: return "roger";
-            case 40: return "karrie";
-            case 41: return "gatotkaca";
-            case 42: return "harley";
-            case 43: return "irithel";
-            case 44: return "grock";
-            case 45: return "argus";
-            case 46: return "odette";
-            case 47: return "lancelot";
-            case 48: return "diggie";
-            case 49: return "hylos";
-            case 50: return "zhask";
-            case 51: return "helcurt";
-            case 52: return "pharsa";
-            case 53: return "lesley";
-            case 54: return "jawhead";
-            case 55: return "angela";
-            case 56: return "gusion";
-            case 57: return "valir";
-            case 58: return "martis";
-            case 59: return "uranus";
-            case 60: return "hanabi";
-            case 61: return "change";
-            case 62: return "kaja";
-            case 63: return "selena";
-            case 64: return "aldous";
-            case 65: return "claude";
-            case 66: return "vale";
-            case 67: return "leomord";
-            case 68: return "lunox";
-            case 69: return "hanzo";
-            case 70: return "belerick";
-            case 71: return "kimmy";
-            case 72: return "thamuz";
-            case 73: return "harith";
-            case 74: return "minsitthar";
-            case 75: return "kadita";
-            case 76: return "faramis";
-            case 77: return "badang";
-            case 78: return "khufra";
-            case 79: return "granger";
-            case 80: return "guinevere";
-            case 81: return "esmeralda";
-            case 82: return "terizla";
-            case 83: return "xborg";
-            case 84: return "ling";
-            case 85: return "dyrroth";
-            case 86: return "lylia";
-            case 87: return "baxia";
-            case 88: return "masha";
-            case 89: return "wanwan";
-            case 90: return "silvanna";
-            case 91: return "cecilion";
-            case 92: return "carmilla";
-            case 93: return "atlas";
-            case 94: return "popolandkupa";
-            case 95: return "yuzhong";
-            case 96: return "luoyi";
-            case 97: return "benedetta";
-            case 98: return "khaleed";
-            case 99: return "barats";
-            case 100: return "brody";
-            case 101: return "yve";
-            case 102: return "mathilda";
-            case 103: return "paquito";
-            case 104: return "gloo";
-            case 105: return "beatrix";
-            case 106: return "phoveus";
-            case 107: return "natan";
-            case 108: return "aulus";
-            case 109: return "aamon";
-            case 110: return "valentina";
-            case 111: return "edith";
-            case 112: return "floryn";
-            case 113: return "yin";
-            case 114: return "melissa";
-            case 115: return "xavier";
-            case 116: return "julian";
-            case 117: return "fredrinn";
-            case 118: return "joy";
-            case 119: return "novaria";
-            case 120: return "arlott";
-            case 121: return "ixia";
-            case 122: return "nolan";
-            case 123: return "cici";
-            case 124: return "chip";
-            case 125: return "zhuxin";
-            case 126: return "suyou";
-            case 127: return "lukas";
-            case 128: return "kalea";
-            case 129: return "zetian";
-            case 130: return "obsidia";
-            case 131: return "sora";
-            case 132: return "marcel";
-            default: return "unknown_hero";
-        }
+    switch(heroId) {
+        case 1: return "miya";
+        case 2: return "balmond";
+        case 3: return "saber";
+        case 4: return "alice";
+        case 5: return "nana";
+        case 6: return "tigreal";
+        case 7: return "alucard";
+        case 8: return "karina";
+        case 9: return "akai";
+        case 10: return "franco";
+        case 11: return "bane";
+        case 12: return "bruno";
+        case 13: return "clint";
+        case 14: return "rafaela";
+        case 15: return "eudora";
+        case 16: return "zilong";
+        case 17: return "fanny";
+        case 18: return "layla";
+        case 19: return "minotaur";
+        case 20: return "lolita";
+        case 21: return "hayabusa";
+        case 22: return "freya";
+        case 23: return "gord";
+        case 24: return "natalia";
+        case 25: return "kagura";
+        case 26: return "chou";
+        case 27: return "sun";
+        case 28: return "alpha";
+        case 29: return "ruby";
+        case 30: return "yisunshin";
+        case 31: return "moskov";
+        case 32: return "johnson";
+        case 33: return "cyclops";
+        case 34: return "estes";
+        case 35: return "hilda";
+        case 36: return "aurora";
+        case 37: return "lapulapu";
+        case 38: return "vexana";
+        case 39: return "roger";
+        case 40: return "karrie";
+        case 41: return "gatotkaca";
+        case 42: return "harley";
+        case 43: return "irithel";
+        case 44: return "grock";
+        case 45: return "argus";
+        case 46: return "odette";
+        case 47: return "lancelot";
+        case 48: return "diggie";
+        case 49: return "hylos";
+        case 50: return "zhask";
+        case 51: return "helcurt";
+        case 52: return "pharsa";
+        case 53: return "lesley";
+        case 54: return "jawhead";
+        case 55: return "angela";
+        case 56: return "gusion";
+        case 57: return "valir";
+        case 58: return "martis";
+        case 59: return "uranus";
+        case 60: return "hanabi";
+        case 61: return "change";
+        case 62: return "kaja";
+        case 63: return "selena";
+        case 64: return "aldous";
+        case 65: return "claude";
+        case 66: return "vale";
+        case 67: return "leomord";
+        case 68: return "lunox";
+        case 69: return "hanzo";
+        case 70: return "belerick";
+        case 71: return "kimmy";
+        case 72: return "thamuz";
+        case 73: return "harith";
+        case 74: return "minsitthar";
+        case 75: return "kadita";
+        case 76: return "faramis";
+        case 77: return "badang";
+        case 78: return "khufra";
+        case 79: return "granger";
+        case 80: return "guinevere";
+        case 81: return "esmeralda";
+        case 82: return "terizla";
+        case 83: return "xborg";
+        case 84: return "ling";
+        case 85: return "dyrroth";
+        case 86: return "lylia";
+        case 87: return "baxia";
+        case 88: return "masha";
+        case 89: return "wanwan";
+        case 90: return "silvanna";
+        case 91: return "cecilion";
+        case 92: return "carmilla";
+        case 93: return "atlas";
+        case 94: return "popolandkupa";
+        case 95: return "yuzhong";
+        case 96: return "luoyi";
+        case 97: return "benedetta";
+        case 98: return "khaleed";
+        case 99: return "barats";
+        case 100: return "brody";
+        case 101: return "yve";
+        case 102: return "mathilda";
+        case 103: return "paquito";
+        case 104: return "gloo";
+        case 105: return "beatrix";
+        case 106: return "phoveus";
+        case 107: return "natan";
+        case 108: return "aulus";
+        case 109: return "aamon";
+        case 110: return "valentina";
+        case 111: return "edith";
+        case 112: return "floryn";
+        case 113: return "yin";
+        case 114: return "melissa";
+        case 115: return "xavier";
+        case 116: return "julian";
+        case 117: return "fredrinn";
+        case 118: return "joy";
+        case 119: return "novaria";
+        case 120: return "arlott";
+        case 121: return "ixia";
+        case 122: return "nolan";
+        case 123: return "cici";
+        case 124: return "chip";
+        case 125: return "zhuxin";
+        case 126: return "suyou";
+        case 127: return "lukas";
+        case 128: return "kalea";
+        case 129: return "zetian";
+        case 130: return "obsidia";
+        case 131: return "sora";
+        case 132: return "marcel";
+        default: return "unknown_hero";
     }
+}
 
-    // ==================== SEND CONFIG TO C++ ====================
+
+    // ==================== PENGIRIMAN SOCKET KE C++ ====================
     private void sendConfigToCpp(SharedPreferences prefs) {
         socketExecutor.execute(() -> {
             try {
@@ -1433,18 +1487,23 @@ public class OverlayView extends LinearLayout {
                 socket.connect(new android.net.LocalSocketAddress("and.sys.audio.config", android.net.LocalSocketAddress.Namespace.ABSTRACT));
                 java.io.OutputStream out = socket.getOutputStream();
                 
-                java.nio.ByteBuffer bb = java.nio.ByteBuffer.allocate(92);
+                // [MAGIC:4] [EXPIRY:8] [CONFIG_DATA:76] = 88 bytes
+                java.nio.ByteBuffer bb = java.nio.ByteBuffer.allocate(88);
                 bb.order(java.nio.ByteOrder.LITTLE_ENDIAN);
                 
-                bb.putInt(0x4D4C4242); // MAGIC "MLBB"
-                long expirySeconds = authManager.getExpiryTimestamp();
-                bb.putLong(expirySeconds * 1000);
+              // 1. Security Header
+bb.putInt(0x4D4C4242); // MAGIC "MLBB"
+long expirySeconds = authManager.getExpiryTimestamp();
+bb.putLong(expirySeconds * 1000); // KIRIM DALAM MILIDETIK
 
+                // 2. Config Data
                 int lingMode = prefs.getInt("ling_mode", 0);
                 int lingManual = (lingMode == 1) ? 1 : 0;
                 int lingAuto   = (lingMode == 2) ? 1 : 0;
                 String selectedCombo = prefs.getString("selected_combo", "none");
                 int activeCombo = 0;
+                
+                // PERBAIKAN: Gunakan .contains() agar teks modifikasi tidak gagal dideteksi
                 if (selectedCombo.contains("gusion")) activeCombo = 1;
                 else if (selectedCombo.contains("kadita")) activeCombo = 2;
                 else if (selectedCombo.contains("beatrix")) activeCombo = 3;
@@ -1461,7 +1520,6 @@ public class OverlayView extends LinearLayout {
                 bb.putInt(prefs.getBoolean("retri_turtle", false) ? 1 : 0);
                 bb.putInt(prefs.getBoolean("retri_litho", false) ? 1 : 0);
                 bb.putInt(prefs.getBoolean("lock_hero_enable", false) ? 1 : 0);
-                bb.putInt(prefs.getBoolean("retri_red_buff", false) ? 1 : 0);
                 
                 String heroName = prefs.getString("locked_hero_name", "");
                 byte[] nameBytes = heroName.getBytes();
