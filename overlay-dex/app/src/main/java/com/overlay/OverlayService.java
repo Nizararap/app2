@@ -28,6 +28,8 @@ public class OverlayService extends Service {
     private boolean isLoginShown = false;
     
     private static final int RETRY_DELAY_MS = 2000;
+    private static final long KEY_CHECK_INTERVAL_MS = 10 * 60 * 1000; // 10 menit (ubah jadi 60*60*1000 untuk 1 jam)
+    private long lastKeyCheckTime = 0;
 
     @Override
     public void onCreate() {
@@ -115,27 +117,33 @@ public class OverlayService extends Service {
     }
 
     private void startConnectionChecker() {
-        if (connectionChecker != null) handler.removeCallbacks(connectionChecker);
-        connectionChecker = new Runnable() {
-            @Override
-            public void run() {
-                if (tryConnectToNative()) {
-                    // Jika C++ hidup, munculkan overlay
-                    if (!isOverlayShown) {
-                        showOverlayUI();
-                    }
-                } else {
-                    // Jika C++ mati (game ditutup), hancurkan overlay (mencegah zombie/double)
-                    if (isOverlayShown) {
-                        hideOverlayUI();
-                    }
+    if (connectionChecker != null) handler.removeCallbacks(connectionChecker);
+    connectionChecker = new Runnable() {
+        @Override
+        public void run() {
+            // Cek koneksi ke native
+            if (tryConnectToNative()) {
+                if (!isOverlayShown) {
+                    showOverlayUI();
                 }
-                // SELALU ulangi pengecekan setiap 2 detik sebagai detak jantung (Heartbeat)
-                handler.postDelayed(this, RETRY_DELAY_MS);
+            } else {
+                if (isOverlayShown) {
+                    hideOverlayUI();
+                }
             }
-        };
-        handler.post(connectionChecker);
-    }
+
+            // Periodic check key ke server (setiap interval)
+            long now = System.currentTimeMillis();
+            if (now - lastKeyCheckTime >= KEY_CHECK_INTERVAL_MS) {
+                lastKeyCheckTime = now;
+                performKeyCheck();
+            }
+
+            handler.postDelayed(this, RETRY_DELAY_MS);
+        }
+    };
+    handler.post(connectionChecker);
+}
 
     private boolean tryConnectToNative() {
         try {
@@ -206,6 +214,38 @@ public class OverlayService extends Service {
         // PENTING: Dihapus pemanggilan startConnectionChecker() dari sini
         // karena looping sudah di-handle penuh di atas
     }
+    
+    private void performKeyCheck() {
+    String savedKey = authManager.getPlainKey();
+    if (savedKey == null) return; // Belum login, tidak perlu cek
+
+    authManager.validateKey(savedKey, new KeyAuthManager.AuthCallback() {
+        @Override
+        public void onSuccess() {
+            // Key masih valid, tidak perlu tindakan
+        }
+
+        @Override
+        public void onFailure(String reason) {
+            if (reason.startsWith("NET_ERROR")) {
+                // Masalah jaringan, jangan logout
+                return;
+            }
+            // Key expired atau dihapus dari server
+            authManager.logout();
+            // Tutup overlay jika terbuka
+            if (isOverlayShown) {
+                hideOverlayUI();
+            }
+            // Tampilkan UI login
+            showLoginUI();
+            // Optional: Toast
+            android.widget.Toast.makeText(OverlayService.this, 
+                "Key revoked or expired! Please login again.", 
+                android.widget.Toast.LENGTH_LONG).show();
+        }
+    });
+}
 
     @Override
     public int onStartCommand(Intent i, int f, int s) {
