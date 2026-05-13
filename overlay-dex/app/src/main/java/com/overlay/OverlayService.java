@@ -30,6 +30,7 @@ public class OverlayService extends Service {
 
     private boolean isOverlayShown = false;
     private boolean isLoginShown = false;
+    private boolean isLoggedOut = false;
     
     private static final int RETRY_DELAY_MS = 2000;
     private static final long KEY_CHECK_INTERVAL_MS = 10 * 60 * 1000; // 10 menit (ubah jadi 60*60*1000 untuk 1 jam)
@@ -102,6 +103,7 @@ public class OverlayService extends Service {
 
         loginView = new LoginView(this, windowManager, lp, () -> {
             hideLoginUI();
+            isLoggedOut = false;
             // Setelah login sukses, tidak perlu validasi lagi, langsung start connection
             startConnectionChecker();
         });
@@ -125,6 +127,8 @@ public class OverlayService extends Service {
     connectionChecker = new Runnable() {
         @Override
         public void run() {
+            if (isLoggedOut) return;
+
             // Cek koneksi ke native
             if (tryConnectToNative()) {
                 if (!isOverlayShown) {
@@ -231,6 +235,7 @@ public class OverlayService extends Service {
         public void onFailure(String reason) {
             if (reason.startsWith("NET_ERROR")) return;
             
+            isLoggedOut = true;
             authManager.logout();
             disableAllFeatures();     // matikan semua fitur
             
@@ -260,6 +265,7 @@ private void disableAllFeatures() {
     editor.putBoolean("retri_turtle", false);
     editor.putBoolean("retri_litho", false);
     editor.putInt("ling_mode", 0);
+    editor.putString("selected_combo", "none");
     editor.apply();
     
     sendConfigToCpp(prefs);
