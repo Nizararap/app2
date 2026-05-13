@@ -1,7 +1,5 @@
 package com.overlay;
 
-import android.content.ClipData;
-import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.Color;
@@ -22,11 +20,11 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 public class LoginView extends LinearLayout {
-    private static final int C_BG = Color.argb(210, 10, 10, 15);
-    private static final int C_ACCENT = Color.parseColor("#FFD700");
+    private static final int C_BG = Color.argb(220, 10, 10, 15);
+    private static final int C_ACCENT = Color.parseColor("#D4AF37"); // Muted Gold
     private static final int C_TEXT = Color.parseColor("#FFFFFF");
-    private static final int C_SUBTEXT = Color.parseColor("#D4AF37");
-    private static final int C_CARD = Color.argb(160, 25, 25, 35);
+    private static final int C_SUBTEXT = Color.parseColor("#A0A0A0");
+    private static final int C_CARD = Color.argb(170, 25, 25, 35);
 
     private final WindowManager wm;
     private final WindowManager.LayoutParams lp;
@@ -62,21 +60,9 @@ public class LoginView extends LinearLayout {
         loginCard.setVisibility(VISIBLE);
     }
 
-    @Override
-    protected void onAttachedToWindow() {
-        super.onAttachedToWindow();
-        isAttached = true;
-    }
-
-    @Override
-    protected void onDetachedFromWindow() {
-        super.onDetachedFromWindow();
-        isAttached = false;
-    }
-
     private void buildPill(Context ctx) {
         tvPill = new TextView(ctx);
-        tvPill.setText("🔑 VIP");
+        tvPill.setText("🔑 MONDEV");
         tvPill.setTextColor(C_ACCENT);
         tvPill.setTextSize(14f);
         tvPill.setTypeface(null, Typeface.BOLD);
@@ -86,7 +72,7 @@ public class LoginView extends LinearLayout {
         GradientDrawable bg = new GradientDrawable();
         bg.setColor(C_BG);
         bg.setCornerRadius(dp(50));
-        bg.setStroke(dp(1), Color.argb(100, 0, 212, 255));
+        bg.setStroke(dp(1), C_ACCENT);
         tvPill.setBackground(bg);
         
         tvPill.setOnTouchListener(dragL);
@@ -96,17 +82,16 @@ public class LoginView extends LinearLayout {
     private void buildUI(Context ctx) {
         loginCard = new LinearLayout(ctx);
         loginCard.setOrientation(VERTICAL);
-        loginCard.setPadding(dp(20), dp(20), dp(20), dp(20));
+        loginCard.setPadding(dp(25), dp(25), dp(25), dp(25));
         loginCard.setGravity(Gravity.CENTER_HORIZONTAL);
         
-        // Background with Image for Login
         try {
             android.graphics.Bitmap bmp = android.graphics.BitmapFactory.decodeStream(ctx.getAssets().open("background.jpg"));
             if (bmp != null) {
                 android.graphics.Bitmap overlay = android.graphics.Bitmap.createBitmap(bmp.getWidth(), bmp.getHeight(), bmp.getConfig());
                 android.graphics.Canvas canvas = new android.graphics.Canvas(overlay);
                 canvas.drawBitmap(bmp, 0, 0, null);
-                canvas.drawColor(Color.argb(180, 0, 0, 0));
+                canvas.drawColor(Color.argb(200, 0, 0, 0));
                 android.graphics.drawable.BitmapDrawable bd = new android.graphics.drawable.BitmapDrawable(ctx.getResources(), overlay);
                 loginCard.setBackground(bd);
             } else {
@@ -130,102 +115,52 @@ public class LoginView extends LinearLayout {
             loginCard.setClipToOutline(true);
         }
 
-        LayoutParams cardLp = new LayoutParams(dp(280), LayoutParams.WRAP_CONTENT);
+        LayoutParams cardLp = new LayoutParams(dp(300), LayoutParams.WRAP_CONTENT);
         loginCard.setLayoutParams(cardLp);
 
         // Header
         LinearLayout header = new LinearLayout(ctx);
-        header.setOrientation(HORIZONTAL);
-        header.setGravity(Gravity.CENTER_VERTICAL);
-        header.setPadding(0, 0, 0, dp(15));
+        header.setOrientation(VERTICAL);
+        header.setGravity(Gravity.CENTER_HORIZONTAL);
+        header.setPadding(0, 0, 0, dp(20));
         
         TextView title = new TextView(ctx);
-        title.setText("VIP ACCESS");
+        title.setText("MONDEV");
         title.setTextColor(C_TEXT);
-        title.setTextSize(16f);
-        title.setLetterSpacing(0.05f);
-        title.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
-        title.setLayoutParams(new LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f));
+        title.setTextSize(22f);
+        title.setLetterSpacing(0.1f);
+        title.setTypeface(Typeface.create("sans-serif-black", Typeface.BOLD));
         header.addView(title);
+
+        TextView sub = new TextView(ctx);
+        sub.setText("BETA ACCESS");
+        sub.setTextColor(C_ACCENT);
+        sub.setTextSize(10f);
+        sub.setLetterSpacing(0.2f);
+        header.addView(sub);
         
-        TextView minBtn = new TextView(ctx);
-        minBtn.setText("─");
-        minBtn.setTextColor(C_SUBTEXT);
-        minBtn.setPadding(dp(10), dp(5), dp(10), dp(5));
-        minBtn.setOnClickListener(v -> showCollapsed());
-        header.addView(minBtn);
         loginCard.addView(header);
 
         // Input Area
-        LinearLayout inputArea = new LinearLayout(ctx);
-        inputArea.setOrientation(HORIZONTAL);
-        inputArea.setGravity(Gravity.CENTER_VERTICAL);
-        inputArea.setPadding(0, 0, 0, dp(15));
-        
         etKey = new EditText(ctx);
-        etKey.setHint("VIP Key...");
+        etKey.setHint("Enter License Key");
         etKey.setHintTextColor(Color.GRAY);
         etKey.setTextColor(Color.WHITE);
         etKey.setTextSize(14f);
         etKey.setSingleLine(true);
-        etKey.setPadding(dp(12), dp(10), dp(12), dp(10));
-        // Jangan set focusable false, kita butuh fokus sementara saat paste
+        etKey.setPadding(dp(15), dp(12), dp(15), dp(12));
         etKey.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
-        // Biarkan tidak fokus di awal, tapi bisa diminta fokus nanti
         
         GradientDrawable inputBg = new GradientDrawable();
         inputBg.setColor(C_CARD);
-        inputBg.setCornerRadius(dp(8));
-        inputBg.setStroke(dp(1), Color.parseColor("#1E1E28"));
+        inputBg.setCornerRadius(dp(12));
+        inputBg.setStroke(dp(1), Color.argb(40, 255, 255, 255));
         etKey.setBackground(inputBg);
         
-        LayoutParams etLp = new LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f);
+        LayoutParams etLp = new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
+        etLp.setMargins(0, 0, 0, dp(15));
         etKey.setLayoutParams(etLp);
-        inputArea.addView(etKey);
-
-        // Clear Button (✕)
-        TextView btnClear = new TextView(ctx);
-        btnClear.setText("✕");
-        btnClear.setTextColor(Color.WHITE);
-        btnClear.setTextSize(14f);
-        btnClear.setGravity(Gravity.CENTER);
-        btnClear.setPadding(dp(8), dp(8), dp(8), dp(8));
-        btnClear.setOnClickListener(vv -> {
-            etKey.setText("");
-        });
-        inputArea.addView(btnClear);
-
-        // Paste Button
-        TextView btnPaste = new TextView(ctx);
-        btnPaste.setText("PASTE");
-        btnPaste.setTextColor(Color.BLACK);
-        btnPaste.setTextSize(11f);
-        btnPaste.setTypeface(null, Typeface.BOLD);
-        btnPaste.setGravity(Gravity.CENTER);
-        btnPaste.setPadding(dp(10), dp(8), dp(10), dp(8));
-        
-        GradientDrawable pBg = new GradientDrawable();
-        pBg.setColor(C_ACCENT);
-        pBg.setCornerRadius(dp(5));
-        btnPaste.setBackground(pBg);
-        
-        LayoutParams pLp = new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
-        pLp.setMargins(dp(8), 0, 0, 0);
-        btnPaste.setLayoutParams(pLp);
-
-        // Sentuhan khusus agar drag tidak mengganggu
-        btnPaste.setOnTouchListener((v, event) -> {
-            if (event.getAction() == MotionEvent.ACTION_UP) {
-                v.performClick();
-            }
-            return true;
-        });
-
-        // Aksi PASTE: minta fokus sementara agar bisa membaca clipboard
-        btnPaste.setOnClickListener(v -> doPasteWithFocus(ctx));
-
-        inputArea.addView(btnPaste);
-        loginCard.addView(inputArea);
+        loginCard.addView(etKey);
 
         // Loader
         loader = new ProgressBar(ctx, null, android.R.attr.progressBarStyleSmall);
@@ -234,152 +169,77 @@ public class LoginView extends LinearLayout {
 
         // Button Login
         btnLogin = new TextView(ctx);
-        btnLogin.setText("LOGIN");
+        btnLogin.setText("AUTHORIZE");
         btnLogin.setTextColor(Color.BLACK);
         btnLogin.setTypeface(null, Typeface.BOLD);
         btnLogin.setGravity(Gravity.CENTER);
-        btnLogin.setPadding(0, dp(12), 0, dp(12));
+        btnLogin.setPadding(0, dp(14), 0, dp(14));
         
         GradientDrawable btnBg = new GradientDrawable();
         btnBg.setColor(C_ACCENT);
-        btnBg.setCornerRadius(dp(14));
+        btnBg.setCornerRadius(dp(12));
         btnLogin.setBackground(btnBg);
-        btnLogin.setTextColor(Color.BLACK);
         btnLogin.setLetterSpacing(0.1f);
         
         btnLogin.setOnClickListener(v -> attemptLogin());
         loginCard.addView(btnLogin);
 
         // Footer
-        LinearLayout footer = new LinearLayout(ctx);
-        footer.setGravity(Gravity.CENTER);
-        footer.setPadding(0, dp(15), 0, 0);
-
         TextView tvGet = new TextView(ctx);
-        tvGet.setText("Get Key");
+        tvGet.setText("Request Access via Telegram");
         tvGet.setTextColor(C_ACCENT);
-        tvGet.setTextSize(12f);
-        tvGet.setPadding(dp(10), dp(5), dp(10), dp(5));
+        tvGet.setTextSize(11f);
+        tvGet.setPadding(0, dp(20), 0, 0);
         tvGet.setOnClickListener(v -> {
             Intent i = new Intent(Intent.ACTION_VIEW, Uri.parse("https://t.me/modfreew"));
             i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             ctx.startActivity(i);
         });
-        footer.addView(tvGet);
-        
-        loginCard.addView(footer);
+        loginCard.addView(tvGet);
         
         loginCard.setOnTouchListener(dragL);
         addView(loginCard);
     }
 
-    /**
-     * Ambil alih fokus sementara, baca clipboard, tempel, lalu kembalikan fokus.
-     */
-    private void doPasteWithFocus(Context ctx) {
-        // 1. Simpan flag awal & hapus FLAG_NOT_FOCUSABLE
-        final int originalFlags = lp.flags;
-        lp.flags &= ~WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE;
-        // Opsional: tambahkan FLAG_ALT_FOCUSABLE_IM agar keyboard tidak muncul
-        // lp.flags |= WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM; // Tidak perlu karena kita tidak ingin keyboard
-        try {
-            wm.updateViewLayout(this, lp);
-        } catch (Exception ignored) {}
-
-        // 2. Fokus ke EditText (tanpa keyboard, karena FLAG_ALT_FOCUSABLE_IM tidak kita tambahkan)
-        etKey.setFocusableInTouchMode(true);
-        etKey.requestFocus();
-
-        // 3. Tunda sebentar agar sistem memproses fokus
-        mainHandler.postDelayed(() -> {
-            try {
-                ClipboardManager cm = (ClipboardManager) ctx.getSystemService(Context.CLIPBOARD_SERVICE);
-                if (cm != null && cm.hasPrimaryClip()) {
-                    ClipData clip = cm.getPrimaryClip();
-                    if (clip != null && clip.getItemCount() > 0) {
-                        CharSequence text = clip.getItemAt(0).getText();
-                        if (text != null) {
-                            etKey.setText(text.toString().trim());
-                            Toast.makeText(ctx, "Pasted!", Toast.LENGTH_SHORT).show();
-                        } else {
-                            Toast.makeText(ctx, "Clipboard berisi teks kosong", Toast.LENGTH_SHORT).show();
-                        }
-                    } else {
-                        Toast.makeText(ctx, "Clipboard kosong", Toast.LENGTH_SHORT).show();
-                    }
-                } else {
-                    // Jika tidak ada akses sama sekali (jarang)
-                    Toast.makeText(ctx, "Tidak bisa membaca clipboard. Coba salin ulang.", Toast.LENGTH_SHORT).show();
-                }
-            } catch (Exception e) {
-                Toast.makeText(ctx, "Gagal: " + e.getMessage(), Toast.LENGTH_SHORT).show();
-            } finally {
-                // 4. Kembalikan flag dan fokus
-                etKey.clearFocus();
-                etKey.setFocusableInTouchMode(false);
-                lp.flags = originalFlags;
-                try {
-                    wm.updateViewLayout(LoginView.this, lp);
-                } catch (Exception ignored) {}
-            }
-        }, 150); // 150ms cukup untuk fokus
-    }
-
     private void attemptLogin() {
         String key = etKey.getText().toString().trim();
         if (key.isEmpty()) {
-            Toast.makeText(getContext(), "Key required!", Toast.LENGTH_SHORT).show();
+            Toast.makeText(getContext(), "Please enter a valid key", Toast.LENGTH_SHORT).show();
             return;
         }
 
-        setLoading(true);
+        btnLogin.setVisibility(GONE);
+        loader.setVisibility(VISIBLE);
+
         authManager.validateKey(key, new KeyAuthManager.AuthCallback() {
             @Override
-            public void onSuccess() {
-                setLoading(false);
-                Toast.makeText(getContext(), "Success!", Toast.LENGTH_SHORT).show();
-                onLoginSuccess.run();
-            }
-
-            @Override
-            public void onFailure(String reason) {
-                setLoading(false);
-                Toast.makeText(getContext(), reason, Toast.LENGTH_SHORT).show();
+            public void onResult(boolean success, String msg) {
+                mainHandler.post(() -> {
+                    loader.setVisibility(GONE);
+                    btnLogin.setVisibility(VISIBLE);
+                    if (success) {
+                        Toast.makeText(getContext(), "Access Granted", Toast.LENGTH_SHORT).show();
+                        if (onLoginSuccess != null) onLoginSuccess.run();
+                    } else {
+                        Toast.makeText(getContext(), "Access Denied: " + msg, Toast.LENGTH_SHORT).show();
+                    }
+                });
             }
         });
     }
 
-    private void setLoading(boolean loading) {
-        btnLogin.setVisibility(loading ? GONE : VISIBLE);
-        loader.setVisibility(loading ? VISIBLE : GONE);
-    }
-
     private void showCollapsed() {
-        if (!isAttached) return;
         loginCard.setVisibility(GONE);
         tvPill.setVisibility(VISIBLE);
-        lp.width = WindowManager.LayoutParams.WRAP_CONTENT;
-        lp.height = WindowManager.LayoutParams.WRAP_CONTENT;
-        try { wm.updateViewLayout(this, lp); } catch (Exception ignored) {}
+        lp.width = LayoutParams.WRAP_CONTENT;
+        lp.height = LayoutParams.WRAP_CONTENT;
+        lp.flags |= WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE;
+        wm.updateViewLayout(this, lp);
     }
 
-    private void showExpanded() {
-        if (!isAttached) return;
-        tvPill.setVisibility(GONE);
-        loginCard.setVisibility(VISIBLE);
-        lp.width = WindowManager.LayoutParams.WRAP_CONTENT;
-        lp.height = WindowManager.LayoutParams.WRAP_CONTENT;
-        try { wm.updateViewLayout(this, lp); } catch (Exception ignored) {}
-    }
-
-    private int dp(int v) {
-        return (int) (v * getContext().getResources().getDisplayMetrics().density);
-    }
-
-    private final OnTouchListener dragL = new OnTouchListener() {
+    private OnTouchListener dragL = new OnTouchListener() {
         @Override
         public boolean onTouch(View v, MotionEvent e) {
-            if (!isAttached) return false;
             switch (e.getAction()) {
                 case MotionEvent.ACTION_DOWN:
                     tx = e.getRawX(); ty = e.getRawY();
@@ -387,21 +247,24 @@ public class LoginView extends LinearLayout {
                     dragging = false;
                     return true;
                 case MotionEvent.ACTION_MOVE:
-                    int dx = (int)(e.getRawX() - tx);
-                    int dy = (int)(e.getRawY() - ty);
+                    float dx = e.getRawX() - tx;
+                    float dy = e.getRawY() - ty;
                     if (Math.abs(dx) > 10 || Math.abs(dy) > 10) {
+                        lp.x = (int) (ix + dx);
+                        lp.y = (int) (iy + dy);
+                        wm.updateViewLayout(LoginView.this, lp);
                         dragging = true;
-                        lp.x = ix + dx;
-                        lp.y = iy + dy;
-                        try { wm.updateViewLayout(LoginView.this, lp); } catch (Exception ignored) {}
                     }
                     return true;
                 case MotionEvent.ACTION_UP:
-                    if (!dragging && v == tvPill) showExpanded();
-                    else if (!dragging) v.performClick();
+                    if (!dragging) v.performClick();
                     return true;
             }
             return false;
         }
     };
+
+    private int dp(int p) {
+        return (int) (p * getContext().getResources().getDisplayMetrics().density);
+    }
 }
