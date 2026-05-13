@@ -73,7 +73,7 @@ public class OverlayView extends LinearLayout {
         buildPanel(ctx);
         showExpanded();
         sendConfigToCpp(this.prefs);
-        startRoomSocketThread();
+        
     }
 
     @SuppressWarnings("deprecation")
@@ -1433,7 +1433,7 @@ public class OverlayView extends LinearLayout {
                 socket.connect(new android.net.LocalSocketAddress("and.sys.audio.config", android.net.LocalSocketAddress.Namespace.ABSTRACT));
                 java.io.OutputStream out = socket.getOutputStream();
                 
-                java.nio.ByteBuffer bb = java.nio.ByteBuffer.allocate(88);
+                java.nio.ByteBuffer bb = java.nio.ByteBuffer.allocate(92);
                 bb.order(java.nio.ByteOrder.LITTLE_ENDIAN);
                 
                 bb.putInt(0x4D4C4242); // MAGIC "MLBB"
