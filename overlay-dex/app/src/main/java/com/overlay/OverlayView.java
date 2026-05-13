@@ -445,13 +445,13 @@ public class OverlayView extends LinearLayout {
             // Use .contains() so modified combo text doesn't break detection
             if (currentCombo.contains("gusion")) displayCombo = "Gusion";
             else if (currentCombo.contains("kadita")) displayCombo = "Kadita";
-            else if (currentCombo.contains("beatrix")) displayCombo = "Beatrix(ultimate lock)";
-            else if (currentCombo.contains("kimmy")) displayCombo = "Kimmy auto (maybe bug)";
+            else if (currentCombo.contains("beatrix")) displayCombo = "Beatrix ultimate";
+            else if (currentCombo.contains("kimmy")) displayCombo = "Kimmy auto Experimental";
             
             final TextView[] btnComboRef = new TextView[1];
             
             btnComboRef[0] = (TextView) btn(ctx, "Select Hero: [" + displayCombo + "]", C_BTN_DRK, () -> {
-                String[] comboList = {"None", "Gusion", "Kadita", "Beatrix(ultimate lock)", "Kimmy auto (maybe bug)"};
+                String[] comboList = {"None", "Gusion", "Kadita", "Beatrix ultimate", "Kimmy auto Experimental"};
                 
                 showModernDialog(ctx, "SELECT HERO COMBO", comboList, selected -> {
                     // Save entire string as lowercase
@@ -913,7 +913,7 @@ public class OverlayView extends LinearLayout {
     private String formatTime(long seconds) {
         if (seconds <= 0) return "Expired";
         if (seconds > 86400) return (seconds / 86400) + " Day";
-        if (seconds > 3600) return (seconds / 3600) + " O'clock";
+        if (seconds > 3600) return (seconds / 3600) + " ..";
         return (seconds / 60) + " Minute";
     }
 
@@ -999,7 +999,17 @@ public class OverlayView extends LinearLayout {
 
         for (final String item : items) {
             TextView btn = new TextView(ctx);
-            btn.setText(item);
+            // Color warning tags red: "(ultimate lock)" and "(maybe bug)"
+            android.text.SpannableString spanItem = new android.text.SpannableString(item);
+            String[] redTags = {"ultimate", "Experimental"};
+            for (String tag : redTags) {
+                int idx = item.toLowerCase().indexOf(tag.toLowerCase());
+                if (idx >= 0) {
+                    spanItem.setSpan(new android.text.style.ForegroundColorSpan(Color.parseColor("#EF5350")),
+                            idx, idx + tag.length(), 0);
+                }
+            }
+            btn.setText(spanItem);
             btn.setTextColor(C_TEXT);
             btn.setPadding(dp(12), dp(12), dp(12), dp(12));
             btn.setTextSize(13f);
@@ -1049,7 +1059,7 @@ public class OverlayView extends LinearLayout {
             l.addView(secTitle(ctx, "ROOM INFO & DRAFT PICK"));
             
             // TOMBOL ON/OFF AGAR TIDAK BIKIN LAG!
-            l.addView(toggleRow(ctx, "Enable Room Info", "Show player data during Draft Pick", "room_info_enable", false));
+            l.addView(toggleRow(ctx, "Enable Room Info", "Show player data", "room_info_enable", false));
             l.addView(vgap(ctx, 10));
 
             roomTableContainer = new LinearLayout(ctx);
@@ -1140,7 +1150,7 @@ public class OverlayView extends LinearLayout {
 
                             if (players.isEmpty()) {
                                 TextView tv = new TextView(getContext());
-                                tv.setText("Waiting for Match / Draft Pick...");
+                                tv.setText("Waiting data...");
                                 tv.setTextColor(C_ACCENT);
                                 tv.setTextSize(12f);
                                 roomTableContainer.addView(tv);
