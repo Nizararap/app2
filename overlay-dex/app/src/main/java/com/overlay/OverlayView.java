@@ -1196,10 +1196,39 @@ addView(tvPill);
                                 return;
                             }
 
-                            // Render a card per player
-                            for (RoomPlayerData p : players) {
-                                roomTableContainer.addView(createPlayerCard(p));
-                            }
+                            // --- LOGIKA AUTO-GROUPING TEAM ---
+java.util.List<RoomPlayerData> blueTeam = new java.util.ArrayList<>();
+java.util.List<RoomPlayerData> redTeam = new java.util.ArrayList<>();
+
+// 1. Pisahkan berdasarkan Camp (1 = Biru/Ally, 2 = Merah/Enemy)
+for (RoomPlayerData p : players) {
+    if (p.camp == 1) {
+        blueTeam.add(p);
+    } else {
+        redTeam.add(p);
+    }
+}
+
+// 2. Render Team Biru (Ally)
+if (!blueTeam.isEmpty()) {
+    roomTableContainer.addView(createTeamLabel(getContext(), "ALLY TEAM", android.graphics.Color.parseColor("#42A5F5")));
+    for (RoomPlayerData p : blueTeam) {
+        roomTableContainer.addView(createPlayerCard(p));
+    }
+}
+
+// 3. Render Pemisah (VS)
+if (!blueTeam.isEmpty() && !redTeam.isEmpty()) {
+    roomTableContainer.addView(createVSDivider(getContext()));
+}
+
+// 4. Render Team Merah (Enemy)
+if (!redTeam.isEmpty()) {
+    roomTableContainer.addView(createTeamLabel(getContext(), "ENEMY TEAM", android.graphics.Color.parseColor("#EF5350")));
+    for (RoomPlayerData p : redTeam) {
+        roomTableContainer.addView(createPlayerCard(p));
+    }
+}
                         });
                     }
                 } catch (Exception e) {
@@ -1210,6 +1239,57 @@ addView(tvPill);
                 }
             }
         }).start();
+    }
+    
+    // Membuat Label Header (ALLY TEAM / ENEMY TEAM)
+    private View createTeamLabel(Context ctx, String text, int color) {
+        android.widget.TextView tv = new android.widget.TextView(ctx);
+        tv.setText(text);
+        tv.setTextColor(color);
+        tv.setTextSize(11f);
+        tv.setTypeface(null, android.graphics.Typeface.BOLD);
+        tv.setLetterSpacing(0.1f);
+        
+        LayoutParams lp = new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
+        lp.setMargins(dp(4), dp(4), 0, dp(8));
+        tv.setLayoutParams(lp);
+        
+        return tv;
+    }
+
+    // Membuat Garis Pemisah (VS) yang keren
+    private View createVSDivider(Context ctx) {
+        LinearLayout container = new LinearLayout(ctx);
+        container.setOrientation(HORIZONTAL);
+        container.setGravity(Gravity.CENTER);
+        
+        LayoutParams lp = new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
+        lp.setMargins(0, dp(4), 0, dp(12));
+        container.setLayoutParams(lp);
+
+        // Garis Kiri
+        View lineLeft = new View(ctx);
+        lineLeft.setBackgroundColor(Color.argb(80, 255, 255, 255));
+        lineLeft.setLayoutParams(new LayoutParams(0, dp(1), 1f));
+
+        // Teks VS
+        android.widget.TextView tvVs = new android.widget.TextView(ctx);
+        tvVs.setText(" VS ");
+        tvVs.setTextColor(C_SUBTEXT);
+        tvVs.setTextSize(10f);
+        tvVs.setTypeface(null, android.graphics.Typeface.BOLD_ITALIC);
+        tvVs.setPadding(dp(8), 0, dp(8), 0);
+
+        // Garis Kanan
+        View lineRight = new View(ctx);
+        lineRight.setBackgroundColor(Color.argb(80, 255, 255, 255));
+        lineRight.setLayoutParams(new LayoutParams(0, dp(1), 1f));
+
+        container.addView(lineLeft);
+        container.addView(tvVs);
+        container.addView(lineRight);
+
+        return container;
     }
 
 // ==========================================
@@ -1422,10 +1502,10 @@ addView(tvPill);
             case 20060: return "aegis";
             case 20070: return "petrify";
             case 20080: return "purify";
-            case 20090: return "flicker";
-            case 20100: return "flameshot";
+            case 20100: return "flicker";
+            case 20140: return "flameshot";
             case 20110: return "arrival";
-            case 20120: return "vengeance";
+            case 20190: return "vengeance";
             // JIKA NANTI EXECUTE TETAP ANGKA (Misal 80001), TAMBAHKAN DI SINI:
             // case 80001: return "execute";
             default: return "unknown_spell"; 
