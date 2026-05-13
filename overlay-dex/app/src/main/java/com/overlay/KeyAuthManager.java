@@ -22,11 +22,22 @@ public class KeyAuthManager {
 
 // PERBAIKAN: Ditambah huruf "X" di belakang agar genap 16 Byte!
     private static final byte[] ENC_KEY = "v1pK3y#2026!SecX".getBytes();*/
-  // --- ANTI-DUMP STRING OBFUSCATION ---
-  
-    private static final int[] URL_DATA = {35, 63, 63, 59, 56, 113, 100, 100, 41, 42, 44, 101, 28, 34, 63, 35, 62, 37, 62, 56, 30, 41, 40, 36, 37, 63, 30, 37, 63, 101, 40, 36, 38, 100, 5, 34, 49, 42, 41, 42, 41, 42, 59, 100, 2, 37, 63, 30, 41, 37, 42, 39, 102, 32, 30, 50, 56, 100, 41, 30, 29, 56, 100, 35, 30, 42, 31, 56, 100, 38, 42, 34, 37, 100, 32, 30, 50, 56, 101, 63, 51, 63};
-    private static final int[] KEY_DATA = {45, 26, 59, 0, 24, 50, 104, 25, 27, 25, 21, 106, 24, 30, 40, 19};
-
+    
+    // --- ANTI-DUMP STRING OBFUSCATION ---
+    // String ini tidak akan pernah terlihat oleh MT Manager / Dex Dumper
+    // === URL OBFUSCATION (SUDAH DIPERBAIKI) ===
+private static final int[] URL_DATA = {
+    35, 63, 63, 59, 56, 113, 100, 100, 57, 42, 60, 101, 44, 34, 63, 35, 
+    62, 41, 62, 56, 46, 57, 40, 36, 37, 63, 46, 37, 63, 101, 40, 36, 
+    38, 100, 5, 34, 49, 42, 57, 42, 57, 42, 59, 100, 2, 37, 63, 46, 
+    57, 37, 42, 39, 102, 32, 46, 50, 56, 100, 57, 46, 45, 56, 100, 
+    35, 46, 42, 47, 56, 100, 38, 42, 34, 37, 100, 32, 46, 50, 56, 
+    101, 63, 51, 63
+};
+    // --- AES KEY OBFUSCATION (16 byte) ---
+private static final int[] KEY_DATA = {
+    45, 26, 59, 0, 24, 50, 104, 25, 27, 25, 21, 106, 12, 46, 40, 19
+};
     // Fungsi rahasia untuk menerjemahkan angka jadi Teks saat Runtime
     private static String decode(int[] input) {
         byte[] result = new byte[input.length];
@@ -96,12 +107,16 @@ public class KeyAuthManager {
     }
 
     public void validateKey(final String userKey, final AuthCallback callback) {
-        new Thread(() -> {
-            HttpURLConnection conn = null;
-            try {
-                String hashedKey = sha256(userKey);
-                URL url = new URL(decode(URL_DATA)); // <--- BACA DARI ARRAY RAHASIA
-                conn = (HttpURLConnection) url.openConnection();
+    new Thread(() -> {
+        HttpURLConnection conn = null;
+        try {
+            String hashedKey = sha256(userKey);
+            
+            // Pakai URL yang sudah di-fix
+            URL url = new URL(decode(URL_DATA)); 
+            
+            conn = (HttpURLConnection) url.openConnection();
+            // ... kode selanjutnya tetap sama
                 conn.setRequestMethod("GET");
                 conn.setConnectTimeout(8000);
                 conn.setReadTimeout(8000);
@@ -141,9 +156,9 @@ public class KeyAuthManager {
                 } else {
                     mainHandler.post(() -> callback.onFailure("Key tidak valid!"));
                 }
-           } catch (Exception e) {
-                // Jangan gunakan e.getMessage() agar URL tidak bocor saat error/tidak ada internet!
-                mainHandler.post(() -> callback.onFailure("NET_ERROR: Gagal terhubung ke server auth!"));
+            } catch (Exception e) {
+                // Beri tag NET_ERROR agar tidak menghapus key saat lag
+                mainHandler.post(() -> callback.onFailure("NET_ERROR: " + e.getMessage()));
             } finally {
                 if (conn != null) conn.disconnect();
             }
