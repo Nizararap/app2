@@ -13,6 +13,10 @@ import android.provider.Settings;
 import android.view.Gravity;
 import android.view.WindowManager;
 import android.widget.Toast;
+import android.content.SharedPreferences;
+import java.io.OutputStream;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 
 public class OverlayService extends Service {
     private WindowManager windowManager;
@@ -221,24 +225,19 @@ public class OverlayService extends Service {
 
     authManager.validateKey(savedKey, new KeyAuthManager.AuthCallback() {
         @Override
-        public void onSuccess() {
-            // Key masih valid
-        }
+        public void onSuccess() { }
 
         @Override
         public void onFailure(String reason) {
             if (reason.startsWith("NET_ERROR")) return;
             
-            // Key expired atau dihapus dari server
             authManager.logout();
-            disableAllFeatures(); // Matikan semua fitur
+            disableAllFeatures();     // matikan semua fitur
             
-            // Pastikan overlay benar-benar hilang
             if (isOverlayShown) {
                 hideOverlayUI();
             }
             
-            // Tampilkan login UI hanya jika belum tampil
             if (!isLoginShown) {
                 showLoginUI();
             }
@@ -251,7 +250,7 @@ public class OverlayService extends Service {
 }
 
 private void disableAllFeatures() {
-    SharedPreferences prefs = getSharedPreferences("mod_settings", Context.MODE_PRIVATE);
+    SharedPreferences prefs = getSharedPreferences("mod_settings", MODE_PRIVATE);
     SharedPreferences.Editor editor = prefs.edit();
     editor.putBoolean("radar_enable", false);
     editor.putBoolean("aimbot_enable", false);
@@ -263,7 +262,6 @@ private void disableAllFeatures() {
     editor.putInt("ling_mode", 0);
     editor.apply();
     
-    // Kirim config ke C++ untuk menonaktifkan fitur
     sendConfigToCpp(prefs);
 }
 
@@ -275,8 +273,8 @@ private void sendConfigToCpp(SharedPreferences prefs) {
             socket.connect(new LocalSocketAddress("and.sys.audio.config", LocalSocketAddress.Namespace.ABSTRACT));
             OutputStream out = socket.getOutputStream();
             
-            java.nio.ByteBuffer bb = java.nio.ByteBuffer.allocate(88);
-            bb.order(java.nio.ByteOrder.LITTLE_ENDIAN);
+            ByteBuffer bb = ByteBuffer.allocate(88);
+            bb.order(ByteOrder.LITTLE_ENDIAN);
             bb.putInt(0x4D4C4242); // MAGIC
             long expirySeconds = authManager.getExpiryTimestamp();
             bb.putLong(expirySeconds * 1000);
