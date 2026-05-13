@@ -119,11 +119,11 @@ public class OverlayView extends LinearLayout {
             int top = (pillSize - newH) / 2;
             canvas.drawBitmap(scaled, left, top, paint);
             
-            // (Opsional) overlay gelap jika ingin
+         /*   // (Opsional) overlay gelap jika ingin
             paint.setXfermode(null);
             paint.setColor(Color.argb(160, 0, 0, 0));
             canvas.drawCircle(pillSize / 2f, pillSize / 2f, pillSize / 2f, paint);
-            
+            */
             android.graphics.drawable.BitmapDrawable bd = new android.graphics.drawable.BitmapDrawable(ctx.getResources(), circle);
             bd.setGravity(Gravity.CENTER);
             tvPill.setBackground(bd);
