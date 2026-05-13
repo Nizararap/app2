@@ -40,10 +40,14 @@ public class RadarView extends View {
     private PlayerInfo[] playerPool = new PlayerInfo[20]; 
 
     private static class PlayerInfo {
+        int entityId;     // <--- TAMBAHAN BARU
         float x, y, z;
         int campType;
         String heroName;
     }
+    
+    // <--- TAMBAHAN BARU: Cache agar tidak membuat String terus-menerus
+    private Map<Integer, String> stringCache = new HashMap<>();
 
     private Bitmap getCircularBitmap(Bitmap bitmap) {
         Bitmap output = Bitmap.createBitmap(bitmap.getWidth(), bitmap.getHeight(), Bitmap.Config.ARGB_8888);
@@ -184,9 +188,7 @@ public class RadarView extends View {
                     dis = new DataInputStream(socket.getInputStream());
 
                     byte[] countBuffer = new byte[4];
-                    // PERBAIKAN UKURAN BYTE (Sesuai dengan struct C++ 40 byte = x,y,z(12) + camp(4) + name(24)? Cek struct, tapi Anda pakai 48)
-                    // Pastikan ukuran ini pas dengan sizeof(PlayerDataPacket) di C++ (44 atau 48).
-                    byte[] packetBuffer = new byte[48]; 
+                    byte[] packetBuffer = new byte[52]; // <--- UBAH DARI 48 JADI 52
 
                     while (isRunning) {
                         dis.readFully(countBuffer);
@@ -200,14 +202,26 @@ public class RadarView extends View {
                             ByteBuffer bb = ByteBuffer.wrap(packetBuffer).order(ByteOrder.LITTLE_ENDIAN);
 
                             PlayerInfo p = playerPool[i]; 
+                            p.entityId = bb.getInt(); // <--- TAMBAHAN BARU BACA ID
                             p.x = bb.getFloat();
                             p.y = bb.getFloat();
                             p.z = bb.getFloat();
                             p.campType = bb.getInt();
 
-                            byte[] nameBytes = new byte[32];
-                            bb.get(nameBytes);
-                            p.heroName = new String(nameBytes).trim();
+                            // <--- LOGIKA ANTI LAG MULAI DI SINI --->
+                            if (stringCache.containsKey(p.entityId)) {
+                                // Jika nama sudah ada di memori, lewati proses convert String (Hemat RAM!)
+                                bb.position(bb.position() + 32); 
+                                p.heroName = stringCache.get(p.entityId);
+                            } else {
+                                // Jika hero baru muncul, baru convert String dan simpan ke Cache
+                                byte[] nameBytes = new byte[32];
+                                bb.get(nameBytes);
+                                String name = new String(nameBytes).trim();
+                                stringCache.put(p.entityId, name);
+                                p.heroName = name;
+                            }
+                            // <--- LOGIKA ANTI LAG SELESAI --->
 
                             newPlayers.add(p);
                         }
