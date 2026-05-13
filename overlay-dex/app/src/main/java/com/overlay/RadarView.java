@@ -81,7 +81,7 @@ public class RadarView extends View {
     private void loadAndDecryptHeroes() {
         try {
             // Baca file tunggal heroes.bin dari folder assets
-            InputStream is = getContext().getAssets().open("Assets.dat");
+            InputStream is = getContext().getAssets().open("assets.dat");
             ByteArrayOutputStream buffer = new ByteArrayOutputStream();
             int nRead;
             byte[] data = new byte[4096];

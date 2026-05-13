@@ -511,7 +511,7 @@ addView(tvPill);
 
         t.addView(card(ctx, l -> {
             l.addView(secTitle(ctx, "DETECTION"));
-            l.addView(slider(ctx, "Aimbot FOV Range", "aimbot_fov", 0, 250, 200));
+            l.addView(slider(ctx, "Aimbot FOV Range", "aimbot_fov", 0, 250, 20));
         }));
         return t;
     }
