@@ -142,7 +142,6 @@ public class OverlayView extends LinearLayout {
         tvPill.setTypeface(null, Typeface.BOLD);
         tvPill.setPadding(dp(12), dp(12), dp(12), dp(12));
     }
-}
 
 tvPill.setElevation(dp(6));
 tvPill.setOnTouchListener(dragL);
