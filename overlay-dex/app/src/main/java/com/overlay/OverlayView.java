@@ -119,19 +119,18 @@ public class OverlayView extends LinearLayout {
         panel = new LinearLayout(ctx);
         panel.setOrientation(VERTICAL);
         
-        // 🔴 HAPUS ATAU KOMENTAR BARIS INI:
-        // panel.setMinimumWidth(dp(265)); 
-        
-        // --- 🟢 TAMBAHKAN 2 BARIS INI SEBAGAI GANTINYA 🟢 ---
-        // Mengunci ukuran UI Menu di angka pasti (300dp)
-        LayoutParams panelLp = new LayoutParams(dp(300), LayoutParams.WRAP_CONTENT);
+        // --- 🟢 UBAH BAGIAN INI 🟢 ---
+        // WRAP_CONTENT = Otomatis menyesuaikan isi konten
+        LayoutParams panelLp = new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
         panel.setLayoutParams(panelLp);
-        // ----------------------------------------------------
+        
+        // Beri batas minimum agar saat di Tab Dashboard tidak terlalu kurus
+        panel.setMinimumWidth(dp(330)); 
+        // ------------------------------
 
         // Background with Image
         try {
             android.graphics.Bitmap bmp = android.graphics.BitmapFactory.decodeStream(ctx.getAssets().open("background.jpg"));
-            // ... sisa kode tetap sama
             if (bmp != null) {
                 // Add a dark overlay on top of the image
                 android.graphics.Bitmap overlay = android.graphics.Bitmap.createBitmap(bmp.getWidth(), bmp.getHeight(), bmp.getConfig());
@@ -1203,6 +1202,7 @@ public class OverlayView extends LinearLayout {
         tvName.setTextSize(12f);
         tvName.setTypeface(null, Typeface.BOLD);
         tvName.setSingleLine(true);
+        tvName.setEllipsize(android.text.TextUtils.TruncateAt.END); // <--- TAMBAHKAN INI (Biar nama panjang jadi "Nizararap...")
 
         TextView tvUid = new TextView(ctx);
         tvUid.setText("UID: " + p.uid + " | Lv." + p.accLv);
@@ -1217,9 +1217,16 @@ public class OverlayView extends LinearLayout {
         colRight.setOrientation(VERTICAL);
         colRight.setGravity(Gravity.END);
         
+        // --- 🟢 TAMBAHKAN 3 BARIS INI 🟢 ---
+        // Memberikan jarak agar teks tidak mepet dengan batas kanan
+        LayoutParams rightLp = new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
+        rightLp.setMargins(dp(10), 0, dp(5), 0); 
+        colRight.setLayoutParams(rightLp);
+        // -----------------------------------
+        
         TextView tvRank = new TextView(ctx);
         tvRank.setText(getRankName(p.rank, p.mythPt));
-        tvRank.setTextColor(Color.parseColor("#FFD700")); 
+        tvRank.setTextColor(Color.parseColor("#FFD700"));
         tvRank.setTextSize(10f);
         tvRank.setTypeface(null, Typeface.BOLD);
 
