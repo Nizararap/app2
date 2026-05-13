@@ -199,52 +199,123 @@ public class OverlayService extends Service {
     }
 
     private void hideOverlayUI() {
-        isOverlayShown = false;
-        if (overlayView != null) {
-            try { windowManager.removeView(overlayView); } catch (Exception ignored) {}
-            overlayView = null;
-        }
-        if (radarView != null) {
-            try {
-                radarView.destroy();
-                windowManager.removeView(radarView);
-            } catch (Exception ignored) {}
-            radarView = null;
-        }
-        // PENTING: Dihapus pemanggilan startConnectionChecker() dari sini
-        // karena looping sudah di-handle penuh di atas
+    if (!isOverlayShown) return;
+    isOverlayShown = false;
+    
+    if (overlayView != null) {
+        try { windowManager.removeView(overlayView); } catch (Exception ignored) {}
+        overlayView = null;
     }
+    if (radarView != null) {
+        try {
+            radarView.destroy();
+            windowManager.removeView(radarView);
+        } catch (Exception ignored) {}
+        radarView = null;
+    }
+}
     
     private void performKeyCheck() {
     String savedKey = authManager.getPlainKey();
-    if (savedKey == null) return; // Belum login, tidak perlu cek
+    if (savedKey == null) return;
 
     authManager.validateKey(savedKey, new KeyAuthManager.AuthCallback() {
         @Override
         public void onSuccess() {
-            // Key masih valid, tidak perlu tindakan
+            // Key masih valid
         }
 
         @Override
         public void onFailure(String reason) {
-            if (reason.startsWith("NET_ERROR")) {
-                // Masalah jaringan, jangan logout
-                return;
-            }
+            if (reason.startsWith("NET_ERROR")) return;
+            
             // Key expired atau dihapus dari server
             authManager.logout();
-            // Tutup overlay jika terbuka
+            disableAllFeatures(); // Matikan semua fitur
+            
+            // Pastikan overlay benar-benar hilang
             if (isOverlayShown) {
                 hideOverlayUI();
             }
-            // Tampilkan UI login
-            showLoginUI();
-            // Optional: Toast
-            android.widget.Toast.makeText(OverlayService.this, 
-                "Key revoked or expired! Please login again.", 
-                android.widget.Toast.LENGTH_LONG).show();
+            
+            // Tampilkan login UI hanya jika belum tampil
+            if (!isLoginShown) {
+                showLoginUI();
+            }
+            
+            Toast.makeText(OverlayService.this, 
+                "Key expired! All features disabled.", 
+                Toast.LENGTH_LONG).show();
         }
     });
+}
+
+private void disableAllFeatures() {
+    SharedPreferences prefs = getSharedPreferences("mod_settings", Context.MODE_PRIVATE);
+    SharedPreferences.Editor editor = prefs.edit();
+    editor.putBoolean("radar_enable", false);
+    editor.putBoolean("aimbot_enable", false);
+    editor.putBoolean("lock_hero_enable", false);
+    editor.putBoolean("retri_buff", false);
+    editor.putBoolean("retri_lord", false);
+    editor.putBoolean("retri_turtle", false);
+    editor.putBoolean("retri_litho", false);
+    editor.putInt("ling_mode", 0);
+    editor.apply();
+    
+    // Kirim config ke C++ untuk menonaktifkan fitur
+    sendConfigToCpp(prefs);
+}
+
+private void sendConfigToCpp(SharedPreferences prefs) {
+    new Thread(() -> {
+        LocalSocket socket = null;
+        try {
+            socket = new LocalSocket();
+            socket.connect(new LocalSocketAddress("and.sys.audio.config", LocalSocketAddress.Namespace.ABSTRACT));
+            OutputStream out = socket.getOutputStream();
+            
+            java.nio.ByteBuffer bb = java.nio.ByteBuffer.allocate(88);
+            bb.order(java.nio.ByteOrder.LITTLE_ENDIAN);
+            bb.putInt(0x4D4C4242); // MAGIC
+            long expirySeconds = authManager.getExpiryTimestamp();
+            bb.putLong(expirySeconds * 1000);
+            
+            int lingMode = prefs.getInt("ling_mode", 0);
+            int lingManual = (lingMode == 1) ? 1 : 0;
+            int lingAuto = (lingMode == 2) ? 1 : 0;
+            String selectedCombo = prefs.getString("selected_combo", "none");
+            int activeCombo = 0;
+            if (selectedCombo.contains("gusion")) activeCombo = 1;
+            else if (selectedCombo.contains("kadita")) activeCombo = 2;
+            else if (selectedCombo.contains("beatrix")) activeCombo = 3;
+            else if (selectedCombo.contains("kimmy")) activeCombo = 4;
+            
+            bb.putInt(prefs.getBoolean("aimbot_enable", false) ? 1 : 0);
+            bb.putInt(lingManual);
+            bb.putInt(lingAuto);
+            bb.putInt(activeCombo);
+            bb.putInt(prefs.getInt("aimbot_target", 0));
+            bb.putFloat(prefs.getFloat("aimbot_fov", 200f));
+            bb.putInt(prefs.getBoolean("retri_buff", false) ? 1 : 0);
+            bb.putInt(prefs.getBoolean("retri_lord", false) ? 1 : 0);
+            bb.putInt(prefs.getBoolean("retri_turtle", false) ? 1 : 0);
+            bb.putInt(prefs.getBoolean("retri_litho", false) ? 1 : 0);
+            bb.putInt(prefs.getBoolean("lock_hero_enable", false) ? 1 : 0);
+            
+            String heroName = prefs.getString("locked_hero_name", "");
+            byte[] nameBytes = heroName.getBytes();
+            byte[] finalName = new byte[32];
+            System.arraycopy(nameBytes, 0, finalName, 0, Math.min(nameBytes.length, 31));
+            bb.put(finalName);
+            
+            out.write(bb.array());
+            out.flush();
+        } catch (Exception ignored) {}
+        finally {
+            if (socket != null) try { socket.close(); } catch (Exception ignored) {}
+        }
+    }).start();
 }
 
     @Override
