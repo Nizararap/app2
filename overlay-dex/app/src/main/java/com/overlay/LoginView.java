@@ -213,16 +213,21 @@ public class LoginView extends LinearLayout {
 
         authManager.validateKey(key, new KeyAuthManager.AuthCallback() {
             @Override
-            public void onResult(boolean success, String msg) {
+            public void onSuccess() {
                 mainHandler.post(() -> {
                     loader.setVisibility(GONE);
                     btnLogin.setVisibility(VISIBLE);
-                    if (success) {
-                        Toast.makeText(getContext(), "Access Granted", Toast.LENGTH_SHORT).show();
-                        if (onLoginSuccess != null) onLoginSuccess.run();
-                    } else {
-                        Toast.makeText(getContext(), "Access Denied: " + msg, Toast.LENGTH_SHORT).show();
-                    }
+                    Toast.makeText(getContext(), "Access Granted", Toast.LENGTH_SHORT).show();
+                    if (onLoginSuccess != null) onLoginSuccess.run();
+                });
+            }
+
+            @Override
+            public void onFailure(String reason) {
+                mainHandler.post(() -> {
+                    loader.setVisibility(GONE);
+                    btnLogin.setVisibility(VISIBLE);
+                    Toast.makeText(getContext(), "Access Denied: " + reason, Toast.LENGTH_SHORT).show();
                 });
             }
         });
