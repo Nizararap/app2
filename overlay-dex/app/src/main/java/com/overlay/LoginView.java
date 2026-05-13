@@ -169,9 +169,9 @@ public class LoginView extends LinearLayout {
         etKey.setTextSize(14f);
         etKey.setSingleLine(true);
         etKey.setPadding(dp(12), dp(10), dp(12), dp(10));
-        // Jangan set focusable false, kita butuh fokus sementara saat paste
+        // Don't set focusable false globally; focus is requested temporarily during paste
         etKey.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
-        // Biarkan tidak fokus di awal, tapi bisa diminta fokus nanti
+        // Not focused on init — focus will be requested when needed
         
         GradientDrawable inputBg = new GradientDrawable();
         inputBg.setColor(C_CARD);
@@ -213,7 +213,7 @@ public class LoginView extends LinearLayout {
         pLp.setMargins(dp(8), 0, 0, 0);
         btnPaste.setLayoutParams(pLp);
 
-        // Sentuhan khusus agar drag tidak mengganggu
+        // Special touch handler so dragging doesn't interfere with paste tap
         btnPaste.setOnTouchListener((v, event) -> {
             if (event.getAction() == MotionEvent.ACTION_UP) {
                 v.performClick();
@@ -221,7 +221,7 @@ public class LoginView extends LinearLayout {
             return true;
         });
 
-        // Aksi PASTE: minta fokus sementara agar bisa membaca clipboard
+        // PASTE action: temporarily request focus to access clipboard
         btnPaste.setOnClickListener(v -> doPasteWithFocus(ctx));
 
         inputArea.addView(btnPaste);
@@ -232,7 +232,7 @@ public class LoginView extends LinearLayout {
         loader.setVisibility(GONE);
         loginCard.addView(loader);
 
-        // Button Login
+        // Login Button
         btnLogin = new TextView(ctx);
         btnLogin.setText("LOGIN");
         btnLogin.setTextColor(Color.BLACK);
@@ -274,23 +274,23 @@ public class LoginView extends LinearLayout {
     }
 
     /**
-     * Ambil alih fokus sementara, baca clipboard, tempel, lalu kembalikan fokus.
+     * Temporarily take focus, read clipboard, paste text, then restore focus.
      */
     private void doPasteWithFocus(Context ctx) {
-        // 1. Simpan flag awal & hapus FLAG_NOT_FOCUSABLE
+        // 1. Save original flags and remove FLAG_NOT_FOCUSABLE
         final int originalFlags = lp.flags;
         lp.flags &= ~WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE;
-        // Opsional: tambahkan FLAG_ALT_FOCUSABLE_IM agar keyboard tidak muncul
-        // lp.flags |= WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM; // Tidak perlu karena kita tidak ingin keyboard
+        // Optional: FLAG_ALT_FOCUSABLE_IM can suppress keyboard — not needed here
+        // lp.flags |= WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM;
         try {
             wm.updateViewLayout(this, lp);
         } catch (Exception ignored) {}
 
-        // 2. Fokus ke EditText (tanpa keyboard, karena FLAG_ALT_FOCUSABLE_IM tidak kita tambahkan)
+        // 2. Focus on EditText (no keyboard since FLAG_ALT_FOCUSABLE_IM is not set)
         etKey.setFocusableInTouchMode(true);
         etKey.requestFocus();
 
-        // 3. Tunda sebentar agar sistem memproses fokus
+        // 3. Short delay to let the system process focus
         mainHandler.postDelayed(() -> {
             try {
                 ClipboardManager cm = (ClipboardManager) ctx.getSystemService(Context.CLIPBOARD_SERVICE);
@@ -302,19 +302,19 @@ public class LoginView extends LinearLayout {
                             etKey.setText(text.toString().trim());
                             Toast.makeText(ctx, "Pasted!", Toast.LENGTH_SHORT).show();
                         } else {
-                            Toast.makeText(ctx, "Clipboard berisi teks kosong", Toast.LENGTH_SHORT).show();
+                            Toast.makeText(ctx, "Clipboard contains empty text", Toast.LENGTH_SHORT).show();
                         }
                     } else {
-                        Toast.makeText(ctx, "Clipboard kosong", Toast.LENGTH_SHORT).show();
+                        Toast.makeText(ctx, "Clipboard is empty", Toast.LENGTH_SHORT).show();
                     }
                 } else {
-                    // Jika tidak ada akses sama sekali (jarang)
-                    Toast.makeText(ctx, "Tidak bisa membaca clipboard. Coba salin ulang.", Toast.LENGTH_SHORT).show();
+                    // No clipboard access (rare)
+                    Toast.makeText(ctx, "Cannot read clipboard. Try copying the key again.", Toast.LENGTH_SHORT).show();
                 }
             } catch (Exception e) {
-                Toast.makeText(ctx, "Gagal: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                Toast.makeText(ctx, "Failed: " + e.getMessage(), Toast.LENGTH_SHORT).show();
             } finally {
-                // 4. Kembalikan flag dan fokus
+                // 4. Restore flags and clear focus
                 etKey.clearFocus();
                 etKey.setFocusableInTouchMode(false);
                 lp.flags = originalFlags;
@@ -322,7 +322,7 @@ public class LoginView extends LinearLayout {
                     wm.updateViewLayout(LoginView.this, lp);
                 } catch (Exception ignored) {}
             }
-        }, 150); // 150ms cukup untuk fokus
+        }, 150); // 150ms is enough for focus to register
     }
 
     private void attemptLogin() {

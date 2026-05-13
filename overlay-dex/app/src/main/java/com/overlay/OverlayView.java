@@ -122,7 +122,7 @@ public class OverlayView extends LinearLayout {
         LayoutParams panelLp = new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
         panel.setLayoutParams(panelLp);
         
-        // Beri batas minimum agar saat di Tab Dashboard tidak terlalu kurus
+        // Set minimum width so Dashboard tab doesn't look too narrow
         panel.setMinimumWidth(dp(340)); 
         // ------------------------------
 
@@ -398,24 +398,7 @@ public class OverlayView extends LinearLayout {
             LinearLayout rc = new LinearLayout(ctx); rc.setOrientation(VERTICAL);
             rc.setPadding(dp(10), 0, 0, 0);
             rc.addView(secTitle(ctx, "RETRIBUTION"));
-
-            // Buff Blue & Buff Red sebagai info teks berwarna (pure text, bukan toggle)
-            TextView tvBuffBlue = new TextView(ctx);
-            tvBuffBlue.setText("● Buff Blue");
-            tvBuffBlue.setTextColor(Color.parseColor("#42A5F5"));
-            tvBuffBlue.setTextSize(12f);
-            tvBuffBlue.setTypeface(null, Typeface.BOLD);
-            tvBuffBlue.setPadding(0, dp(4), 0, dp(4));
-            rc.addView(tvBuffBlue);
-
-            TextView tvBuffRed = new TextView(ctx);
-            tvBuffRed.setText("● Buff Red");
-            tvBuffRed.setTextColor(Color.parseColor("#EF5350"));
-            tvBuffRed.setTextSize(12f);
-            tvBuffRed.setTypeface(null, Typeface.BOLD);
-            tvBuffRed.setPadding(0, dp(4), 0, dp(4));
-            rc.addView(tvBuffRed);
-
+            rc.addView(checkRowSpanned(ctx, "Buff (", "Blue", " & ", "Red", ")", "retri_buff", false));
             rc.addView(checkRow(ctx, "Lord",   "retri_lord",   false));
             rc.addView(checkRow(ctx, "Turtle", "retri_turtle", false));
             rc.addView(checkRow(ctx, "Litho",  "retri_litho",  false));
@@ -434,13 +417,13 @@ public class OverlayView extends LinearLayout {
 
             final TextView[] btnHeroRef = new TextView[1];
             
-            btnHeroRef[0] = (TextView) btn(ctx, "Pilih Hero:[" + currentHero + "]", C_BTN_DRK, () -> {
+            btnHeroRef[0] = (TextView) btn(ctx, "Select Hero: [" + currentHero + "]", C_BTN_DRK, () -> {
                 java.util.List<String> listHero = radar.getActiveEnemyNames();
                 if (listHero.isEmpty()) {
                     android.widget.Toast.makeText(ctx, "Enemy not detected yet!", android.widget.Toast.LENGTH_SHORT).show();
                 } else {
                     String[] items = listHero.toArray(new String[0]);
-                    // MENGGUNAKAN CUSTOM DIALOG MODERN
+                    // Show custom modern floating dialog
                     showModernDialog(ctx, "TARGET LOCK HERO", items, selected -> {
                         prefs.edit().putString("locked_hero_name", selected).apply();
                         if (btnHeroRef[0] != null) btnHeroRef[0].setText("Select Hero: [" + selected + "]");
@@ -459,7 +442,7 @@ public class OverlayView extends LinearLayout {
             String currentCombo = prefs.getString("selected_combo", "none");
             String displayCombo = "None";
             
-            // Gunakan .contains agar embel-embel teks tidak merusak deteksi
+            // Use .contains() so modified combo text doesn't break detection
             if (currentCombo.contains("gusion")) displayCombo = "Gusion";
             else if (currentCombo.contains("kadita")) displayCombo = "Kadita";
             else if (currentCombo.contains("beatrix")) displayCombo = "Beatrix(ultimate lock)";
@@ -470,8 +453,8 @@ public class OverlayView extends LinearLayout {
             btnComboRef[0] = (TextView) btn(ctx, "Select Hero: [" + displayCombo + "]", C_BTN_DRK, () -> {
                 String[] comboList = {"None", "Gusion", "Kadita", "Beatrix(ultimate lock)", "Kimmy auto (maybe bug)"};
                 
-                showModernDialog(ctx, "PILIH HERO COMBO", comboList, selected -> {
-                    // Simpan seluruh teks ke huruf kecil
+                showModernDialog(ctx, "SELECT HERO COMBO", comboList, selected -> {
+                    // Save entire string as lowercase
                     String valueToSave = selected.equals("None") ? "none" : selected.toLowerCase();
                     prefs.edit().putString("selected_combo", valueToSave).apply();
                     
@@ -647,12 +630,12 @@ public class OverlayView extends LinearLayout {
             GradientDrawable bg = new GradientDrawable();
             bg.setCornerRadius(dp(4));
             if (st[0]) {
-                bg.setColor(C_ACCENT); // Full warna biru jika on
+                bg.setColor(C_ACCENT); // Fill color when on
                 box.setText("✓");
                 box.setTextColor(C_BG); // Warna centang gelap
             } else {
                 bg.setColor(C_BG);
-                bg.setStroke(dp(1), C_SUBTEXT); // Border saja jika off
+                bg.setStroke(dp(1), C_SUBTEXT); // Border only when off
                 box.setText("");
             }
             box.setBackground(bg);
@@ -682,6 +665,71 @@ public class OverlayView extends LinearLayout {
         return r;
     }
     interface TCb { void t(boolean on); }
+
+    // Checkbox with a two-color SpannableString label (e.g. "Blue" in blue, "Red" in red)
+    private View checkRowSpanned(Context ctx, String pre, String word1, String mid, String word2, String post, String key, boolean def) {
+        LinearLayout r = new LinearLayout(ctx);
+        r.setGravity(Gravity.CENTER_VERTICAL);
+        r.setPadding(0, dp(6), 0, dp(6));
+
+        boolean init = prefs.getBoolean(key, def);
+        final boolean[] st = {init};
+
+        TextView box = new TextView(ctx);
+        box.setLayoutParams(new LayoutParams(dp(18), dp(18)));
+        box.setGravity(Gravity.CENTER);
+        box.setTextSize(11f);
+        box.setTypeface(null, Typeface.BOLD);
+
+        Runnable updateBox = () -> {
+            GradientDrawable bg = new GradientDrawable();
+            bg.setCornerRadius(dp(4));
+            if (st[0]) {
+                bg.setColor(C_ACCENT);
+                box.setText("✓");
+                box.setTextColor(C_BG);
+            } else {
+                bg.setColor(C_BG);
+                bg.setStroke(dp(1), C_SUBTEXT);
+                box.setText("");
+            }
+            box.setBackground(bg);
+        };
+        updateBox.run();
+
+        // Build SpannableString: "Buff (Blue & Red)"
+        String full = pre + word1 + mid + word2 + post;
+        android.text.SpannableString span = new android.text.SpannableString(full);
+        int s1 = pre.length();
+        int e1 = s1 + word1.length();
+        int s2 = e1 + mid.length();
+        int e2 = s2 + word2.length();
+        span.setSpan(new android.text.style.ForegroundColorSpan(Color.parseColor("#42A5F5")), s1, e1, 0);
+        span.setSpan(new android.text.style.ForegroundColorSpan(Color.parseColor("#EF5350")), s2, e2, 0);
+
+        TextView lbl = new TextView(ctx);
+        lbl.setText(span);
+        lbl.setTextColor(C_TEXT);
+        lbl.setTextSize(12f);
+        LayoutParams llp = new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
+        llp.setMargins(dp(10), 0, 0, 0);
+        lbl.setLayoutParams(llp);
+
+        r.addView(box);
+        r.addView(lbl);
+        r.setOnClickListener(v -> {
+            if (!authManager.isKeyValid()) {
+                android.widget.Toast.makeText(getContext(), "Key Expired! Please re-login.", android.widget.Toast.LENGTH_SHORT).show();
+                return;
+            }
+            st[0] = !st[0];
+            prefs.edit().putBoolean(key, st[0]).apply();
+            sendConfigToCpp(prefs);
+            updateBox.run();
+            radar.invalidate();
+        });
+        return r;
+    }
 
     private View buildToggle(Context ctx, boolean init, TCb cb) {
         final boolean[] on = {init};
@@ -913,7 +961,7 @@ public class OverlayView extends LinearLayout {
         }
     };
     
-// Interface untuk aksi dialog
+// Interface for dialog item selection callback
     public interface DialogCallback {
         void onSelect(String item);
     }
@@ -922,7 +970,7 @@ public class OverlayView extends LinearLayout {
     private void showModernDialog(Context ctx, String title, String[] items, final DialogCallback callback) {
         final FrameLayout dimBg = new FrameLayout(ctx);
         dimBg.setBackgroundColor(Color.argb(180, 0, 0, 0)); // Background gelap blur
-        dimBg.setOnClickListener(v -> { try { wm.removeView(dimBg); } catch (Exception ignored) {} }); // Klik luar untuk tutup
+        dimBg.setOnClickListener(v -> { try { wm.removeView(dimBg); } catch (Exception ignored) {} }); // Click outside to close
 
         LinearLayout card = new LinearLayout(ctx);
         card.setOrientation(VERTICAL);
@@ -933,7 +981,7 @@ public class OverlayView extends LinearLayout {
         card.setBackground(gd);
         card.setPadding(dp(20), dp(20), dp(20), dp(20));
         
-        // Agar klik di card tidak ikut menutup dialog (menahan event dari dimBg)
+        // Prevent card click from bubbling up to dimBg (which would close the dialog)
         card.setOnClickListener(v -> {});
 
         TextView tvTitle = new TextView(ctx);
@@ -1001,7 +1049,7 @@ public class OverlayView extends LinearLayout {
             l.addView(secTitle(ctx, "ROOM INFO & DRAFT PICK"));
             
             // TOMBOL ON/OFF AGAR TIDAK BIKIN LAG!
-            l.addView(toggleRow(ctx, "Enable Room Info", "Tampilkan data pemain saat Draft Pick", "room_info_enable", false));
+            l.addView(toggleRow(ctx, "Enable Room Info", "Show player data during Draft Pick", "room_info_enable", false));
             l.addView(vgap(ctx, 10));
 
             roomTableContainer = new LinearLayout(ctx);
@@ -1017,7 +1065,7 @@ public class OverlayView extends LinearLayout {
         return t;
     }
 
-    // Class pembantu untuk menyimpan data parsing sementara
+    // Helper class for temporary parsed player data
     private static class RoomPlayerData {
         int camp, uid, zone, heroId, rank, mythPt, matches, wins, accLv, spellId, countryId;
         boolean isLeader;
@@ -1035,7 +1083,7 @@ public class OverlayView extends LinearLayout {
                     dis = new java.io.DataInputStream(socket.getInputStream());
 
                     byte[] countBuf = new byte[4];
-                    // UKURAN BARU: 12 integer * 4 bytes + 32 char bytes = 80 Bytes!
+                    // NEW SIZE: 12 integers * 4 bytes + 32 char bytes = 80 bytes
                     byte[] packetBuf = new byte[80];
 
                     while (isRoomSocketRunning) {
@@ -1045,14 +1093,14 @@ public class OverlayView extends LinearLayout {
 
                         final java.util.List<RoomPlayerData> players = new java.util.ArrayList<>();
                         
-                        // KITA SELALU BACA DATA DARI C++ AGAR BUFFER TIDAK PENUH,
-                        // TAPI KITA HANYA RENDER JIKA TOGGLE DIAKTIFKAN.
+                        // Always read data from C++ to prevent buffer overflow,
+                        // but only parse and render if the toggle is enabled.
                         boolean isEnabled = prefs.getBoolean("room_info_enable", false);
 
                         for (int i = 0; i < count; i++) {
                             dis.readFully(packetBuf);
                             
-                            if (!isEnabled) continue; // Jangan buang CPU parse jika dimatikan
+                            if (!isEnabled) continue; // Skip CPU-heavy parsing when disabled
 
                             java.nio.ByteBuffer bb = java.nio.ByteBuffer.wrap(packetBuf).order(java.nio.ByteOrder.LITTLE_ENDIAN);
                             RoomPlayerData p = new RoomPlayerData();
@@ -1076,7 +1124,7 @@ public class OverlayView extends LinearLayout {
                             players.add(p);
                         }
 
-                        // Update UI di Main Thread
+                        // Update UI on Main Thread
                         post(() -> {
                             if (roomTableContainer == null) return;
                             roomTableContainer.removeAllViews();
@@ -1099,7 +1147,7 @@ public class OverlayView extends LinearLayout {
                                 return;
                             }
 
-                            // Render Card per pemain (Cantik & Rapi)
+                            // Render a card per player
                             for (RoomPlayerData p : players) {
                                 roomTableContainer.addView(createPlayerCard(p));
                             }
@@ -1140,7 +1188,7 @@ public class OverlayView extends LinearLayout {
         cardLp.setMargins(0, 0, 0, dp(6));
         card.setLayoutParams(cardLp);
 
-        // BAGIAN KIRI: Icon Hero & Icon Spell (Dengan Fallback ID)
+        // LEFT SECTION: Hero Icon & Spell Icon (with fallback ID)
         LinearLayout colLeft = new LinearLayout(ctx);
         colLeft.setOrientation(HORIZONTAL);
         colLeft.setGravity(Gravity.CENTER_VERTICAL);
@@ -1154,7 +1202,7 @@ public class OverlayView extends LinearLayout {
         ivHero.setLayoutParams(new FrameLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
         ivHero.setScaleType(android.widget.ImageView.ScaleType.FIT_XY);
         
-        // HAPUS RUMUS BOT (realHeroId / 10). KITA PAKAI ID MURNI DARI GAME!
+        // Use raw hero ID from game directly (no division formula)
         String heroFileName = getHeroNameStr(p.heroId); 
         android.graphics.Bitmap heroBmp = radar.getRawIcon(heroFileName);
 
@@ -1195,12 +1243,12 @@ public class OverlayView extends LinearLayout {
             ivSpell.setImageBitmap(spellBmp);
             spellContainer.addView(ivSpell);
         } else {
-            // JIKA GAMBAR SPELL TIDAK ADA, TAMPILKAN KOTAK + ANGKA ID
+            // If spell image not found, show box with numeric ID
             ivSpell.setBackgroundColor(Color.parseColor("#444444"));
             spellContainer.addView(ivSpell);
             
             TextView tvSpellId = new TextView(ctx);
-            tvSpellId.setText(String.valueOf(p.spellId)); // MENAMPILKAN ID SPELL ASLI DARI MLBB!
+            tvSpellId.setText(String.valueOf(p.spellId)); // Shows actual MLBB spell ID
             tvSpellId.setTextColor(Color.WHITE);
             tvSpellId.setTextSize(6f);
             tvSpellId.setGravity(Gravity.CENTER);
@@ -1223,7 +1271,7 @@ public class OverlayView extends LinearLayout {
         tvName.setTextSize(12f);
         tvName.setTypeface(null, Typeface.BOLD);
         tvName.setSingleLine(true);
-        tvName.setEllipsize(android.text.TextUtils.TruncateAt.END); // <--- TAMBAHKAN INI (Biar nama panjang jadi "Nizararap...")
+        tvName.setEllipsize(android.text.TextUtils.TruncateAt.END); // Truncate long names with "..."
 
         TextView tvUid = new TextView(ctx);
         tvUid.setText("UID: " + p.uid + " | Lv." + p.accLv);
@@ -1238,12 +1286,10 @@ public class OverlayView extends LinearLayout {
         colRight.setOrientation(VERTICAL);
         colRight.setGravity(Gravity.END);
         
-        // --- 🟢 TAMBAHKAN 3 BARIS INI 🟢 ---
-        // Memberikan jarak agar teks tidak mepet dengan batas kanan
+        // Add margin so text doesn't hug the right edge
         LayoutParams rightLp = new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
         rightLp.setMargins(dp(10), 0, dp(5), 0); 
         colRight.setLayoutParams(rightLp);
-        // -----------------------------------
         
         TextView tvRank = new TextView(ctx);
         tvRank.setText(getRankName(p.rank, p.mythPt));
@@ -1494,7 +1540,7 @@ public class OverlayView extends LinearLayout {
               // 1. Security Header
 bb.putInt(0x4D4C4242); // MAGIC "MLBB"
 long expirySeconds = authManager.getExpiryTimestamp();
-bb.putLong(expirySeconds * 1000); // KIRIM DALAM MILIDETIK
+bb.putLong(expirySeconds * 1000); // Send as milliseconds
 
                 // 2. Config Data
                 int lingMode = prefs.getInt("ling_mode", 0);
@@ -1503,7 +1549,7 @@ bb.putLong(expirySeconds * 1000); // KIRIM DALAM MILIDETIK
                 String selectedCombo = prefs.getString("selected_combo", "none");
                 int activeCombo = 0;
                 
-                // PERBAIKAN: Gunakan .contains() agar teks modifikasi tidak gagal dideteksi
+                // FIX: Use .contains() so modified combo text is still detected correctly
                 if (selectedCombo.contains("gusion")) activeCombo = 1;
                 else if (selectedCombo.contains("kadita")) activeCombo = 2;
                 else if (selectedCombo.contains("beatrix")) activeCombo = 3;
