@@ -106,17 +106,32 @@ public class OverlayView extends LinearLayout {
         tvPill.setBackground(bg);
         tvPill.setElevation(dp(4));
         tvPill.setOnTouchListener(dragL);
+        
+        // --- 🟢 TAMBAHKAN 2 BARIS INI 🟢 ---
+        LayoutParams pillLp = new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
+        tvPill.setLayoutParams(pillLp);
+        // -----------------------------------
+        
         addView(tvPill);
     }
 
     private void buildPanel(Context ctx) {
         panel = new LinearLayout(ctx);
         panel.setOrientation(VERTICAL);
-        panel.setMinimumWidth(dp(265));
         
+        // 🔴 HAPUS ATAU KOMENTAR BARIS INI:
+        // panel.setMinimumWidth(dp(265)); 
+        
+        // --- 🟢 TAMBAHKAN 2 BARIS INI SEBAGAI GANTINYA 🟢 ---
+        // Mengunci ukuran UI Menu di angka pasti (300dp)
+        LayoutParams panelLp = new LayoutParams(dp(300), LayoutParams.WRAP_CONTENT);
+        panel.setLayoutParams(panelLp);
+        // ----------------------------------------------------
+
         // Background with Image
         try {
             android.graphics.Bitmap bmp = android.graphics.BitmapFactory.decodeStream(ctx.getAssets().open("background.jpg"));
+            // ... sisa kode tetap sama
             if (bmp != null) {
                 // Add a dark overlay on top of the image
                 android.graphics.Bitmap overlay = android.graphics.Bitmap.createBitmap(bmp.getWidth(), bmp.getHeight(), bmp.getConfig());
