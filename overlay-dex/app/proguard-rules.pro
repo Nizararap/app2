@@ -1,33 +1,42 @@
-# Aturan Dasar (Mencegah Error)
--keep class com.overlay.OverlayService { *; }
--keep class com.overlay.OverlayView { *; }
--keep class com.overlay.LoginView { *; }
+# =========================================================
+# SUPER AGGRESSIVE OBFUSCATION CONFIG
+# =========================================================
 
+# 1. Menghilangkan semua metadata yang bisa membantu reverse engineering
+-renamesourcefileattribute SourceFile
+-keepattributes !*Annotation*,!Signature,!Exceptions,!InnerClasses,!EnclosingMethod,SourceFile,LineNumberTable
+
+# 2. Repackaging: Pindahkan semua class ke root package (menghilangkan struktur folder com/overlay)
+-repackageclasses ''
+-allowaccessmodification
+
+# 3. Obfuscation Nama: Gunakan kamus karakter yang membingungkan (opsional, default a,b,c)
+-useuniqueclassmembernames
+-dontusemixedcaseclassnames
+
+# 4. Optimasi Maksimal
+-optimizationpasses 5
+-overloadaggressively
+
+# 5. Entry Points (Hanya keep yang benar-benar perlu dipanggil dari luar/smali)
+# Kita perlu keep nama class Service agar bisa dipanggil via Intent di inject.smali
+-keep class com.overlay.OverlayService {
+    public <init>();
+    public void onCreate();
+    public int onStartCommand(android.content.Intent, int, int);
+    public void onDestroy();
+}
+
+# Keep method yang dipanggil secara refleksi atau dari native jika ada
 -keepclassmembers class com.overlay.KeyAuthManager {
     public boolean isKeyValid();
     public void validateKey(java.lang.String, com.overlay.KeyAuthManager$AuthCallback);
 }
 
--keep class org.json.** { *; }
+# Keep interface callback agar tidak hilang
+-keep interface com.overlay.KeyAuthManager$AuthCallback { *; }
 
-# =========================================================
-# ADVANCED OBFUSCATION (MENGHANCURKAN STRUKTUR KODE)
-# =========================================================
-
-# Menghilangkan nama file asli dan atribut sumber
--renamesourcefileattribute SourceFile
--keepattributes !*Annotation*,!Signature,!Exceptions,!InnerClasses,!EnclosingMethod
--keepattributes SourceFile,LineNumberTable
-
-# Pindahkan semua class yang tidak dikeep ke root (menghilangkan struktur folder com/overlay)
--repackageclasses ''
--allowaccessmodification
-
-# Optimasi maksimal (Menyulitkan decompilation)
--optimizations !code/simplification/arithmetic,!field/*,!class/merging/*
--optimizationpasses 5
-
-# Membuang Log agar alur aplikasi tidak bisa dilacak via Logcat
+# Buang semua log untuk keamanan
 -assumenosideeffects class android.util.Log {
     public static *** d(...);
     public static *** v(...);
@@ -35,3 +44,6 @@
     public static *** w(...);
     public static *** e(...);
 }
+
+# Jangan obfuscate library standar jika ada (tapi di sini tidak ada external deps)
+-keep class org.json.** { *; }

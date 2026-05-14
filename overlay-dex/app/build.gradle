@@ -20,8 +20,12 @@ android {
             debuggable true
         }
         release {
+            // AKTIFKAN OBFUSCATION DI SINI
             minifyEnabled true
+            shrinkResources false // Jangan shrink resources karena kita hanya butuh DEX
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            
+            // Tambahkan signing config jika perlu, tapi untuk DEX saja biasanya tidak wajib di sini
         }
     }
 
